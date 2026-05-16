@@ -1,112 +1,246 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
-
-import { Collapsible } from '@/components/ui/collapsible';
-import { ExternalLink } from '@/components/external-link';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
+import React, { useState } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Dimensions, TextInput } from 'react-native';
+import { useRouter } from 'expo-router';
+import { Search, LayoutGrid, Award, Star, Compass, ArrowLeft } from 'lucide-react-native';
+import { Colors, Spacing, Radius, Typography } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { IconSymbol } from '@/components/ui/icon-symbol';
-import { Fonts } from '@/constants/theme';
+import { GlassCard } from '@/components/shared/GlassCard';
+import { ServiceCard } from '@/components/home/ServiceCard';
+import * as Haptics from 'expo-haptics';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-export default function TabTwoScreen() {
+const { width } = Dimensions.get('window');
+
+const TRENDING_PROS = [
+  {
+    id: 't1',
+    name: 'Smart Security Inc.',
+    category: 'Security',
+    rating: 4.98,
+    reviews: 850,
+    price: 'Rs. 3,500/hr',
+    distance: '0.5 km',
+    image: 'https://images.unsplash.com/photo-1557597774-9d273605dfa9?q=80&w=400',
+  },
+];
+
+const CATEGORIES = [
+  { id: 'Architecture', label: 'Design' },
+  { id: 'Plumbing', label: 'Plumbing' },
+  { id: 'Electric', label: 'Electric' },
+  { id: 'HVAC', label: 'HVAC' },
+  { id: 'Automation', label: 'Automation' },
+  { id: 'Security', label: 'Security' },
+];
+
+export default function ExploreScreen() {
+  const router = useRouter();
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const handleCategoryPress = (categoryId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    // Navigate back to Home with category filter (future enhancement)
+    // For now, let's navigate to home
+    router.replace('/(tabs)');
+  };
+
+  const handleSearch = () => {
+    if (searchQuery.trim()) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      router.push({
+        pathname: '/request/[id]',
+        params: { id: 'search_' + Date.now(), query: searchQuery }
+      });
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#D0D0D0', dark: '#353636' }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText
-          type="title"
-          style={{
-            fontFamily: Fonts.rounded,
-          }}>
-          Explore
-        </ThemedText>
-      </ThemedView>
-      <ThemedText>This app includes example code to help you get started.</ThemedText>
-      <Collapsible title="File-based routing">
-        <ThemedText>
-          This app has two screens:{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">app/(tabs)/explore.tsx</ThemedText>
-        </ThemedText>
-        <ThemedText>
-          The layout file in <ThemedText type="defaultSemiBold">app/(tabs)/_layout.tsx</ThemedText>{' '}
-          sets up the tab navigator.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/router/introduction">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Android, iOS, and web support">
-        <ThemedText>
-          You can open this project on Android, iOS, and the web. To open the web version, press{' '}
-          <ThemedText type="defaultSemiBold">w</ThemedText> in the terminal running this project.
-        </ThemedText>
-      </Collapsible>
-      <Collapsible title="Images">
-        <ThemedText>
-          For static images, you can use the <ThemedText type="defaultSemiBold">@2x</ThemedText> and{' '}
-          <ThemedText type="defaultSemiBold">@3x</ThemedText> suffixes to provide files for
-          different screen densities
-        </ThemedText>
-        <Image
-          source={require('@/assets/images/react-logo.png')}
-          style={{ width: 100, height: 100, alignSelf: 'center' }}
-        />
-        <ExternalLink href="https://reactnative.dev/docs/images">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Light and dark mode components">
-        <ThemedText>
-          This template has light and dark mode support. The{' '}
-          <ThemedText type="defaultSemiBold">useColorScheme()</ThemedText> hook lets you inspect
-          what the user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
-        </ThemedText>
-        <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-          <ThemedText type="link">Learn more</ThemedText>
-        </ExternalLink>
-      </Collapsible>
-      <Collapsible title="Animations">
-        <ThemedText>
-          This template includes an example of an animated component. The{' '}
-          <ThemedText type="defaultSemiBold">components/HelloWave.tsx</ThemedText> component uses
-          the powerful{' '}
-          <ThemedText type="defaultSemiBold" style={{ fontFamily: Fonts.mono }}>
-            react-native-reanimated
-          </ThemedText>{' '}
-          library to create a waving hand animation.
-        </ThemedText>
-        {Platform.select({
-          ios: (
-            <ThemedText>
-              The <ThemedText type="defaultSemiBold">components/ParallaxScrollView.tsx</ThemedText>{' '}
-              component provides a parallax effect for the header image.
-            </ThemedText>
-          ),
-        })}
-      </Collapsible>
-    </ParallaxScrollView>
+    <ThemedView style={styles.container}>
+      <SafeAreaView style={styles.safeArea}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.header}>
+            <ThemedText style={styles.title}>Discovery</ThemedText>
+            <View style={styles.searchContainer}>
+              <Search size={18} color="rgba(255,255,255,0.4)" style={styles.searchIcon} />
+              <TextInput 
+                style={styles.searchInput}
+                placeholder="Search for a service or pro..."
+                placeholderTextColor="rgba(255,255,255,0.4)"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                onSubmitEditing={handleSearch}
+                returnKeyType="search"
+              />
+            </View>
+          </View>
+
+          {/* Featured Collections */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Elite Collections</ThemedText>
+              <Award size={18} color={Colors.dark.accent} />
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.collectionsScroll}>
+              {[
+                { title: 'Elite Architects', count: '12 Pros' },
+                { title: 'Smart Home Experts', count: '24 Pros' }
+              ].map((item, idx) => (
+                <TouchableOpacity 
+                  key={idx} 
+                  activeOpacity={0.9}
+                  onPress={() => handleCategoryPress('Automation')}
+                >
+                  <GlassCard style={styles.collectionCard}>
+                    <ThemedText style={styles.collectionTitle}>{item.title}</ThemedText>
+                    <ThemedText style={styles.collectionCount}>{item.count}</ThemedText>
+                  </GlassCard>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+
+          {/* All Categories Grid */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Browse Categories</ThemedText>
+              <LayoutGrid size={18} color={Colors.dark.accent} />
+            </View>
+            <View style={styles.grid}>
+              {CATEGORIES.map((cat) => (
+                <TouchableOpacity 
+                  key={cat.id} 
+                  style={styles.gridItem}
+                  onPress={() => handleCategoryPress(cat.id)}
+                >
+                  <GlassCard style={styles.gridCard}>
+                    <ThemedText style={styles.gridLabel}>{cat.label}</ThemedText>
+                  </GlassCard>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {/* Trending Section */}
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <ThemedText style={styles.sectionTitle}>Trending Professionals</ThemedText>
+              <Star size={18} color={Colors.dark.accent} />
+            </View>
+            {TRENDING_PROS.map(pro => (
+              <ServiceCard 
+                key={pro.id} 
+                {...pro} 
+                onBook={() => {
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  router.push({
+                    pathname: '/booking/[id]',
+                    params: { id: pro.id, name: pro.name, price: pro.price }
+                  });
+                }}
+              />
+            ))}
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  headerImage: {
-    color: '#808080',
-    bottom: -90,
-    left: -35,
-    position: 'absolute',
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
   },
-  titleContainer: {
+  safeArea: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: Spacing.lg,
+  },
+  header: {
+    marginBottom: Spacing.xl,
+    paddingTop: 10,
+  },
+  title: {
+    fontSize: Typography.sizes.xxxl,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFF',
+    marginBottom: Spacing.lg,
+  },
+  searchContainer: {
     flexDirection: 'row',
-    gap: 8,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    paddingHorizontal: Spacing.md,
+  },
+  searchIcon: {
+    marginRight: Spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    height: 50,
+    color: '#FFF',
+    fontFamily: Typography.fonts.primary,
+    fontSize: Typography.sizes.sm,
+  },
+  section: {
+    marginBottom: Spacing.xxl,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  sectionTitle: {
+    fontSize: Typography.sizes.lg,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFF',
+  },
+  collectionsScroll: {
+    gap: Spacing.md,
+  },
+  collectionCard: {
+    width: 200,
+    height: 120,
+    justifyContent: 'flex-end',
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.03)',
+  },
+  collectionTitle: {
+    fontSize: Typography.sizes.md,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFF',
+  },
+  collectionCount: {
+    fontSize: 10,
+    color: Colors.dark.accent,
+    fontFamily: Typography.fonts.bold,
+    textTransform: 'uppercase',
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.md,
+  },
+  gridItem: {
+    width: (width - Spacing.lg * 2 - Spacing.md) / 2,
+  },
+  gridCard: {
+    height: 80,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: Radius.md,
+    backgroundColor: 'rgba(255,255,255,0.02)',
+  },
+  gridLabel: {
+    fontSize: Typography.sizes.sm,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFF',
   },
 });
