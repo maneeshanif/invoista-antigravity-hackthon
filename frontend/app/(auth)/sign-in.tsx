@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, TextInput, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions } from 'react-native';
 import { useSignIn } from '@clerk/expo';
-import { useRouter, Link } from 'expo-router';
+import { useRouter, Link, type Href } from 'expo-router';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { PremiumButton } from '@/components/shared/PremiumButton';
@@ -9,40 +9,83 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 export default function SignInScreen() {
-  const { signIn, setActive, isLoaded } = useSignIn();
+  // Clerk Expo v3 API: useSignIn returns { signIn, errors, fetchStatus }
+  const { signIn, errors: clerkErrors, fetchStatus } = useSignIn();
   const router = useRouter();
   const { width, height } = useWindowDimensions();
   const isLargeScreen = width > 768;
 
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const loading = fetchStatus === 'fetching';
+
   const onSignInPress = async () => {
-    console.log('SignIn Press:', { isLoaded, emailAddress, hasSignIn: !!signIn });
-    if (!signIn) return;
-    setLoading(true);
+    if (!signIn) {
+      setError('Authentication service is loading, please try again.');
+      return;
+    }
+
+    if (!emailAddress || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
     setError('');
 
     try {
-      const completeSignIn = await signIn.create({
-        identifier: emailAddress,
+      console.log('Attempting signIn.password with:', emailAddress);
+      // Clerk Expo v3 API: use signIn.password() instead of signIn.create()
+      const { error: signInError } = await signIn.password({
+        emailAddress,
         password,
       });
 
-      if (setActive) {
-        await setActive({ session: completeSignIn.createdSessionId });
+      if (signInError) {
+        console.error('SignIn error:', JSON.stringify(signInError, null, 2));
+        setError(signInError.longMessage || signInError.message || 'Sign in failed.');
+        return;
+      }
+
+      console.log('SignIn status:', signIn.status);
+
+      if (signIn.status === 'complete') {
+        console.log('Sign in complete, finalizing...');
+        // Clerk Expo v3 API: use signIn.finalize() to activate session
+        await signIn.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) {
+              console.log('Session task:', session.currentTask);
+              return;
+            }
+            const url = decorateUrl('/');
+            if (url.startsWith('http')) {
+              window.location.href = url;
+            } else {
+              router.push(url as Href);
+            }
+          },
+        });
+      } else if (signIn.status === 'needs_second_factor') {
+        console.log('Needs MFA');
+        setError('Multi-factor authentication required. Please contact support.');
+      } else if (signIn.status === 'needs_client_trust') {
+        console.log('Needs client trust verification');
+        const emailCodeFactor = signIn.supportedSecondFactors?.find(
+          (factor: any) => factor.strategy === 'email_code',
+        );
+        if (emailCodeFactor) {
+          await signIn.mfa.sendEmailCode();
+          setError('A verification code has been sent to your email.');
+        }
       } else {
-        console.error('setActive is not defined');
-        setError('Authentication system is still loading. Please try again.');
+        console.error('Sign-in not complete:', signIn.status);
+        setError('Sign in incomplete. Please try again.');
       }
     } catch (err: any) {
-      console.error('SignIn Error Details:', JSON.stringify(err, null, 2));
-      const clerkError = err.errors?.[0]?.message || err.message || 'An unknown error occurred';
-      setError(clerkError);
-    } finally {
-      setLoading(false);
+      console.error('SignIn Error:', JSON.stringify(err, null, 2));
+      setError(err?.message || 'Sign in failed. Please try again.');
     }
   };
 
@@ -153,13 +196,7 @@ export default function SignInScreen() {
               </Link>
             </View>
 
-            <PremiumButton
-              title="Explore as Guest"
-              variant="outline"
-              onPress={() => router.replace('/(tabs)')}
-              style={[styles.button, { marginTop: 16, borderColor: 'rgba(255,255,255,0.2)' }]}
-              textStyle={{ color: 'rgba(255,255,255,0.6)' }}
-            />
+
           </GlassCard>
           
           {!isLargeScreen && (
