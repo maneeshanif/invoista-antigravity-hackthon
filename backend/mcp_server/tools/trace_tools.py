@@ -5,7 +5,7 @@ Persists a single agent reasoning step to the TRACE_LOGS table for full
 transparency in the admin trace dashboard.
 """
 
-from typing import Any
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -15,6 +15,7 @@ from mcp_server.db import supabase_client
 class CreateSessionInput(BaseModel):
     user_id: str = Field(..., description="UUID of the user starting the session")
     raw_input: str = Field(..., description="The user's initial raw request text")
+    session_id: Optional[str] = Field(None, description="Optional UUID to use for the session")
 
 
 class CreateSessionOutput(BaseModel):
@@ -84,15 +85,17 @@ def create_session(input: CreateSessionInput) -> CreateSessionOutput:
     """
     Creates a new agent session in the database.
     """
+    session_data = {
+        "user_id": input.user_id,
+        "raw_input": input.raw_input,
+        "status": "in_progress",
+    }
+    if input.session_id:
+        session_data["id"] = input.session_id
+
     resp = (
         supabase_client.table("sessions")
-        .insert(
-            {
-                "user_id": input.user_id,
-                "raw_input": input.raw_input,
-                "status": "in_progress",
-            }
-        )
+        .insert(session_data)
         .execute()
     )
     row = resp.data[0]
