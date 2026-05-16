@@ -17,10 +17,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - `context/feature-specs/02-db-setup.md` (Database Setup Spec)
 - Implement `Feature 01 - Initialize Project` (FastAPI backend with `uv`, basic config).
 - Implement `Feature 02 - Database Setup` (Created Supabase schema and seed data migration).
+- `context/feature-specs/03-mcp-server.md` (MCP Server Spec)
+- Implement `Feature 03 - MCP Server` (`mcp_server/server.py`, `db.py`, and all 5 tools: `find_providers`, `rank_providers`, `create_booking`, `schedule_followups`, `write_trace_log`).
 
 ## In Progress
 
-- Setup MCP server tools.
+- Connect Agent Orchestrator to MCP server tools.
 
 ## Next Up
 
@@ -36,4 +38,6 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Session Notes
 
-- Add context needed to resume work in the next session.
+- MCP server is at `mcp_server/server.py`. Run with `uv run python -m mcp_server.server` or `mcp dev mcp_server/server.py`.
+- `SUPABASE_URL` must be set in `.env` for the DB client to initialise.
+- All 5 tools are pure functions in `mcp_server/tools/`; tested ranking logic independently.
