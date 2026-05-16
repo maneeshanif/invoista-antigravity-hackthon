@@ -1,7 +1,7 @@
 from fastapi import APIRouter
 
+from app.api.routes import requests
+
 api_router = APIRouter()
 
-# TODO: Include specific routers here as they are developed
-# from app.api.routes import some_router
-# api_router.include_router(some_router.router, prefix="/some", tags=["some"])
+api_router.include_router(requests.router, tags=["Agents"])
