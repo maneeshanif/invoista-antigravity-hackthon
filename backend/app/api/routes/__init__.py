@@ -11,7 +11,6 @@ from app.api.routes import (
 
 api_router = APIRouter()
 
-api_router.include_router(requests.router, tags=["Agents"])
 api_router.include_router(requests.router, prefix="/requests", tags=["Requests"])
 api_router.include_router(traces.router, prefix="/requests", tags=["Traces"]) # Shared prefix for sub-routes
 api_router.include_router(providers.router, prefix="/providers", tags=["Providers"])

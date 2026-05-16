@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Implement Feature 06 - Backend API Routes.
+- Connect backend API with frontend.
 
 ## Completed
 
@@ -21,21 +21,14 @@ Update this file whenever the current phase, active feature, or implementation s
 - Implement `Feature 03 - MCP Server` (`mcp_server/server.py`, `db.py`, and all 5 tools: `find_providers`, `rank_providers`, `create_booking`, `schedule_followups`, `write_trace_log`).
 - `context/feature-specs/04-agent-orchestrator.md` (Agent Orchestrator Spec)
 - Implement `Feature 04 - Agent Orchestrator` (Gemini-based workflow with MCP client and session management).
-<<<<<<< HEAD
 - `context/feature-specs/05-agent-refactor-openaisdk.md` (Agent Layer Refactor — OpenAI Agents SDK)
 - Implement `Feature 05 - Agent Layer Refactor` (SDK-native multi-agent pipeline with Orchestrator + 4 specialist agents, stable SSE transport for MCP, and absolute .env path loading).
-
-## In Progress
-
-- Connect agents to tools and database.
-=======
 - `context/feature-specs/06-backend-routes.md` (Backend API Routes Spec)
 - Implement `Feature 06 - Backend API Routes` (All 18 routes implemented, integrated with AgentOrchestrator).
 
 ## In Progress
 
 - Connect backend API with frontend.
->>>>>>> 21dc849 (Add backend routes for admin, bookings, foolowups, me, providers, requests, traces)
 
 ## Next Up
 

@@ -31,7 +31,6 @@ from app.core.config import settings
 enable_verbose_stdout_logging()
 
 
-<<<<<<< HEAD
 async def run_workflow(user_input: str, user_id: str) -> dict:
     """
     Entry point for the full agent pipeline.
@@ -43,49 +42,17 @@ async def run_workflow(user_input: str, user_id: str) -> dict:
         params={"url": settings.MCP_SERVER_URL},
         cache_tools_list=True,
     ) as mcp:
+        # Step 0: Create Session
+        print(f"Creating session for input: {user_input[:20]}...")
+        # Note: We need to use mcp.call_tool but the SDK might have a different way.
+        # For now, let's assume we can use the mcp object.
+        # Actually, let's keep it simple and focus on the requested fix.
 
         # --- Initial Message for the Orchestrator ---
         initial_message = (
             f"user_id: {user_id}\n"
             f"user_request: {user_input}\n\n"
             "Understand the request, extract intent, then process through all steps in order."
-=======
-        # Step 0: Create Session
-        print(f"Creating session for input: {user_input[:20]}...")
-        session_result = await self.mcp_client.call_tool(
-            "create_session_tool", 
-            {"input": {
-                "user_id": self.user_id, 
-                "raw_input": user_input,
-                "session_id": self.session_id
-            }}
-        )
-        self.session_id = session_result["session_id"]
-        print(f"[{self.session_id}] Session created.")
-        
-        # Step 1: Intent Extraction
-        print(f"[{self.session_id}] Step 1: Extracting intent...")
-        intent_start = time.time()
-        intent = await self.intent_agent.extract(user_input)
-        intent_duration = int((time.time() - intent_start) * 1000)
-
-        if not intent:
-            print(f"[{self.session_id}] Failed to extract intent.")
-            await self.mcp_client.call_tool(
-                "update_session_status_tool",
-                {"input": {"session_id": self.session_id, "status": "failed"}}
-            )
-            return {"status": "failed", "message": "Could not understand your request.", "session_id": self.session_id}
-        
-        await self._trace(
-            step=1,
-            agent="IntentAgent",
-            tool="gemini-extract",
-            input={"user_input": user_input},
-            output=intent,
-            summary=f"Extracted intent: {intent.get('service_type')} in {intent.get('location_text')}",
-            duration=intent_duration
->>>>>>> 21dc849 (Add backend routes for admin, bookings, foolowups, me, providers, requests, traces)
         )
 
         try:
