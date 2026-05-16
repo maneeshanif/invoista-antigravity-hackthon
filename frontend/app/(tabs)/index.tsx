@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions } from 'react-native';
-import { useUser } from '@clerk/expo';
+import { StyleSheet, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, Alert, Modal } from 'react-native';
+import { useUser, useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { 
   Bell, 
@@ -11,7 +11,8 @@ import {
   Clock, 
   LayoutGrid,
   ChevronRight,
-  User
+  User,
+  LogOut
 } from 'lucide-react-native';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
@@ -84,8 +85,27 @@ const CATEGORIES = [
 
 export default function HomeScreen() {
   const { user } = useUser();
+  const { signOut } = useAuth();
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+
+  const handleSignOutPress = () => {
+    setShowLogoutModal(true);
+  };
+
+  const confirmSignOut = async () => {
+    try {
+      setShowLogoutModal(false);
+      if (Platform.OS !== 'web') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      }
+      await signOut();
+      router.replace('/(auth)/sign-in');
+    } catch (err) {
+      console.error('Error signing out:', err);
+    }
+  };
 
   const filteredProviders = selectedCategory === 'all' 
     ? MOCK_PROVIDERS 
@@ -99,6 +119,8 @@ export default function HomeScreen() {
     });
   };
 
+  const displayName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 'Premium';
+
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -110,16 +132,16 @@ export default function HomeScreen() {
           {/* Executive Header */}
           <View style={styles.header}>
             <View style={styles.profileSection}>
-              <View style={styles.avatarContainer}>
+              <TouchableOpacity onPress={handleSignOutPress} style={styles.avatarContainer}>
                 {user?.imageUrl ? (
-                  <Image source={user.imageUrl} style={styles.avatar} />
+                  <Image source={{ uri: user.imageUrl }} style={styles.avatar} />
                 ) : (
                   <View style={styles.avatarPlaceholder}><User size={20} color="#FFF" /></View>
                 )}
-              </View>
+              </TouchableOpacity>
               <View style={styles.welcomeText}>
                 <ThemedText style={styles.greeting}>PRIVATE CONCIERGE</ThemedText>
-                <ThemedText style={styles.userName}>{user?.firstName || 'Guest'} Member</ThemedText>
+                <ThemedText style={styles.userName}>{displayName} Member</ThemedText>
               </View>
             </View>
             <View style={styles.headerActions}>
@@ -227,6 +249,39 @@ export default function HomeScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
       </SafeAreaView>
+
+      {/* Premium Logout Modal */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={showLogoutModal}
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalIconContainer}>
+              <LogOut size={24} color="#FF4B4B" />
+            </View>
+            <ThemedText style={styles.modalTitle}>Sign Out</ThemedText>
+            <ThemedText style={styles.modalMessage}>Are you sure you want to sign out of your account?</ThemedText>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalCancelButton} 
+                onPress={() => setShowLogoutModal(false)}
+              >
+                <ThemedText style={styles.modalCancelText}>Cancel</ThemedText>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.modalSignOutButton} 
+                onPress={confirmSignOut}
+              >
+                <ThemedText style={styles.modalSignOutText}>Sign Out</ThemedText>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ThemedView>
   );
 }
@@ -394,5 +449,76 @@ const styles = StyleSheet.create({
     color: Colors.dark.accent,
     fontFamily: Typography.fonts.bold,
     letterSpacing: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#1A1D24',
+    borderRadius: Radius.xl,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.1)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255, 75, 75, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: Typography.sizes.lg,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFFFFF',
+    marginBottom: Spacing.xs,
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.6)',
+    textAlign: 'center',
+    marginBottom: Spacing.xl,
+    lineHeight: 22,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    width: '100%',
+  },
+  modalCancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    alignItems: 'center',
+  },
+  modalCancelText: {
+    color: '#FFFFFF',
+    fontFamily: Typography.fonts.medium,
+  },
+  modalSignOutButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.lg,
+    backgroundColor: '#FF4B4B',
+    alignItems: 'center',
+  },
+  modalSignOutText: {
+    color: '#FFFFFF',
+    fontFamily: Typography.fonts.bold,
   },
 });

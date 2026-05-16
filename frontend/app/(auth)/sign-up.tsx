@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, View, TextInput, KeyboardAvoidingView, Platform, ScrollView, useWindowDimensions } from 'react-native';
-import { useSignUp } from '@clerk/expo';
-import { useRouter, Link } from 'expo-router';
+import { useSignUp, useAuth } from '@clerk/expo';
+import { useRouter, Link, type Href } from 'expo-router';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { PremiumButton } from '@/components/shared/PremiumButton';
@@ -9,77 +9,97 @@ import { GlassCard } from '@/components/shared/GlassCard';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 export default function SignUpScreen() {
-  const { isLoaded, signUp, setActive } = useSignUp();
+  // Clerk Expo v3 API: useSignUp returns { signUp, errors, fetchStatus }
+  const { signUp, errors: clerkErrors, fetchStatus } = useSignUp();
+  const { isSignedIn } = useAuth();
   const router = useRouter();
   const { width } = useWindowDimensions();
   const isLargeScreen = width > 768;
 
   const [emailAddress, setEmailAddress] = useState('');
   const [password, setPassword] = useState('');
-  const [pendingVerification, setPendingVerification] = useState(false);
   const [code, setCode] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const loading = fetchStatus === 'fetching';
+
+  // Clerk v3: check signUp.status to determine which view to show
+  const pendingVerification =
+    signUp?.status === 'missing_requirements' &&
+    signUp?.unverifiedFields?.includes('email_address') &&
+    signUp?.missingFields?.length === 0;
+
   const onSignUpPress = async () => {
-    console.log('SignUp Press:', { isLoaded, emailAddress, hasSignUp: !!signUp });
     if (!signUp) {
-      console.log('SignUp object not ready');
+      setError('Authentication service is loading, please wait a moment.');
       return;
     }
-    setLoading(true);
+
+    if (!emailAddress || !password) {
+      setError('Please enter both email and password.');
+      return;
+    }
+
     setError('');
 
     try {
-      console.log('Attempting signUp.create with:', emailAddress);
-      const response = await signUp.create({
+      console.log('Attempting signUp.password with:', emailAddress);
+      // Clerk Expo v3 API: use signUp.password() instead of signUp.create()
+      const { error: passwordError } = await signUp.password({
         emailAddress,
         password,
       });
 
-      console.log('SignUp Success Response:', response.status);
-
-      if (response.status === 'missing_requirements') {
-        console.log('Step 2: Preparing verification...');
-        await signUp.prepareVerification({ strategy: 'email_code' });
-        setPendingVerification(true);
-      } else if (response.status === 'complete') {
-        console.log('Step 2: Sign up complete, setting active session');
-        if (setActive) {
-          await setActive({ session: response.createdSessionId });
-        }
+      if (passwordError) {
+        console.error('SignUp password error:', JSON.stringify(passwordError, null, 2));
+        setError(passwordError.longMessage || passwordError.message || 'Sign up failed.');
+        return;
       }
+
+      console.log('SignUp password success, sending email code...');
+      // Clerk Expo v3 API: use signUp.verifications.sendEmailCode()
+      await signUp.verifications.sendEmailCode();
+      console.log('Email verification code sent!');
+      // The component will re-render with pendingVerification = true
     } catch (err: any) {
-      console.error('CRITICAL SIGNUP ERROR:', err);
-      const clerkError = err.errors?.[0]?.message || err.message || 'Signup failed. Please check your internet or try another browser.';
-      setError(clerkError);
-      setLoading(false);
-    } finally {
-      setLoading(false);
+      console.error('CRITICAL SIGNUP ERROR:', JSON.stringify(err, null, 2));
+      setError(err?.message || 'Sign up failed. Please try again.');
     }
   };
 
   const onPressVerify = async () => {
     if (!signUp) return;
-    setLoading(true);
     setError('');
 
     try {
-      const completeSignUp = await signUp.attemptVerification({
-        code,
-        strategy: 'email_code'
-      });
+      console.log('Verifying email code...');
+      // Clerk Expo v3 API: use signUp.verifications.verifyEmailCode()
+      await signUp.verifications.verifyEmailCode({ code });
 
-      if (setActive) {
-        await setActive({ session: completeSignUp.createdSessionId });
+      if (signUp.status === 'complete') {
+        console.log('Sign up complete, finalizing...');
+        // Clerk Expo v3 API: use signUp.finalize() to activate session
+        await signUp.finalize({
+          navigate: ({ session, decorateUrl }) => {
+            if (session?.currentTask) {
+              console.log('Session task:', session.currentTask);
+              return;
+            }
+            const url = decorateUrl('/');
+            if (url.startsWith('http')) {
+              window.location.href = url;
+            } else {
+              router.push(url as Href);
+            }
+          },
+        });
       } else {
-        console.error('setActive is not defined');
-        setError('Verification successful, but session could not be activated. Please sign in manually.');
+        console.error('Sign-up not complete after verification:', signUp.status);
+        setError('Verification incomplete. Please try again.');
       }
     } catch (err: any) {
-      setError(err.errors?.[0]?.message || 'Verification failed');
-    } finally {
-      setLoading(false);
+      console.error('Verify error:', JSON.stringify(err, null, 2));
+      setError(err?.message || 'Verification failed');
     }
   };
 
@@ -178,6 +198,16 @@ export default function SignUpScreen() {
                 </View>
 
                 {error ? <ThemedText style={styles.error}>{error}</ThemedText> : null}
+                {/* Show Clerk field-level errors */}
+                {clerkErrors?.fields?.emailAddress && (
+                  <ThemedText style={styles.error}>{clerkErrors.fields.emailAddress.message}</ThemedText>
+                )}
+                {clerkErrors?.fields?.password && (
+                  <ThemedText style={styles.error}>{clerkErrors.fields.password.message}</ThemedText>
+                )}
+
+                {/* Required by Clerk bot protection — renders as div#clerk-captcha on web */}
+                <View nativeID="clerk-captcha" />
 
                 <PremiumButton
                   title={loading ? "Creating account..." : "Continue"}
@@ -192,13 +222,7 @@ export default function SignUpScreen() {
                   </Link>
                 </View>
 
-                <PremiumButton
-                  title="Explore as Guest"
-                  variant="outline"
-                  onPress={() => router.replace('/(tabs)')}
-                  style={[styles.button, { marginTop: 16, borderColor: 'rgba(255,255,255,0.2)' }]}
-                  textStyle={{ color: 'rgba(255,255,255,0.6)' }}
-                />
+
               </>
             ) : (
               <>
@@ -225,12 +249,13 @@ export default function SignUpScreen() {
                   style={styles.button}
                 />
 
-                <TouchableOpacity 
-                  onPress={() => setPendingVerification(false)} 
-                  style={{ marginTop: 16, alignItems: 'center' }}
-                >
-                  <ThemedText style={styles.footerText}>Back to Sign Up</ThemedText>
-                </TouchableOpacity>
+                <PremiumButton
+                  title="Resend Code"
+                  variant="outline"
+                  onPress={() => signUp?.verifications?.sendEmailCode()}
+                  style={[styles.button, { marginTop: 16, borderColor: 'rgba(255,255,255,0.2)' }]}
+                  textStyle={{ color: 'rgba(255,255,255,0.6)' }}
+                />
               </>
             )}
           </GlassCard>

@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts, Outfit_400Regular, Outfit_500Medium, Outfit_700Bold } from '@expo-google-fonts/outfit';
-import { ClerkProvider, ClerkLoaded, useAuth } from '@clerk/expo';
+import { ClerkProvider, useAuth } from '@clerk/expo';
 import { tokenCache } from '@/lib/auth';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -34,17 +34,16 @@ function InitialLayout() {
     if (!isLoaded) return;
 
     const inAuthGroup = segments[0] === '(auth)';
-    
-    // For development/hackathon: allow bypassing if not in auth group
-    // In production, this would be more strict
+
     if (isSignedIn && inAuthGroup) {
       router.replace('/(tabs)');
     } else if (!isSignedIn && !inAuthGroup) {
-      // Temporarily disable strict redirect to allow Guest Mode
-      // router.replace('/(auth)/sign-in');
-      console.log('Redirect to sign-in disabled for Guest Mode');
+      // Enforce strict redirect to sign in
+      router.replace('/(auth)/sign-in');
     }
   }, [isSignedIn, isLoaded, segments]);
+
+  if (!isLoaded) return null;
 
   return (
     <Stack>
@@ -87,12 +86,10 @@ export default function RootLayout() {
 
   return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ClerkLoaded>
-        <ThemeProvider value={colorScheme === 'dark' ? customDarkTheme : DefaultTheme}>
-          <InitialLayout />
-          <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        </ThemeProvider>
-      </ClerkLoaded>
+      <ThemeProvider value={colorScheme === 'dark' ? customDarkTheme : DefaultTheme}>
+        <InitialLayout />
+        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      </ThemeProvider>
     </ClerkProvider>
   );
 }
