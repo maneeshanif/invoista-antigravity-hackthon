@@ -14,6 +14,7 @@ or via MCP dev mode:
     mcp dev mcp_server/server.py
 """
 
+import os
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server.tools.booking_tools import (
@@ -59,6 +60,8 @@ mcp = FastMCP(
         "→ create_booking → schedule_followups. Write a trace log after every step "
         "using write_trace_log."
     ),
+    host="0.0.0.0",
+    port=int(os.environ.get("MCP_PORT", 8001))
 )
 
 
@@ -127,7 +130,8 @@ def update_session_status_tool(input: UpdateSessionInput) -> UpdateSessionOutput
 
 
 # ---------------------------------------------------------------------------
-# Entry point
+# Entry point — Streamable HTTP transport
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    mcp.run()
+    mcp.run(transport="sse")
+    # Tools will be available at: http://localhost:8001/sse

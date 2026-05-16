@@ -4,8 +4,12 @@ intent_agent.py — Extracts intent from user requests using Gemini.
 
 import os
 import google.generativeai as genai
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 from app.agents.prompts import INTENT_AGENT_PROMPT
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 class IntentAgent:
     def __init__(self):
@@ -15,29 +19,30 @@ class IntentAgent:
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel('gemini-1.5-flash')
 
-    async def extract(self, user_input: str) -> Dict[str, Any]:
+    async def extract(self, user_input: str) -> Optional[Dict[str, Any]]:
         """
         Extracts structured intent from user input.
+        Returns the intent dictionary or None if extraction/parsing fails.
         """
         prompt = f"{INTENT_AGENT_PROMPT}\n\nUser Request: {user_input}\n\nReturn JSON only."
         
-        # Using structured output or just parsing the text response
-        # Gemini 1.5 Pro/Flash works well with JSON instructions
-        response = self.model.generate_content(
-            prompt,
-            generation_config={"response_mime_type": "application/json"}
-        )
-        
+        import asyncio
         import json
+        
         try:
+            # Wrap the synchronous SDK call in a thread to avoid blocking the event loop
+            response = await asyncio.wait_for(
+                asyncio.to_thread(
+                    self.model.generate_content,
+                    prompt,
+                    generation_config={"response_mime_type": "application/json"}
+                ),
+                timeout=10.0
+            )
             return json.loads(response.text)
+        except asyncio.TimeoutError:
+            logger.error("Intent extraction timed out after 10s.")
         except Exception as e:
-            # Fallback or error handling
-            print(f"Error parsing intent: {e}")
-            return {
-                "service_type": "AC Technician", # Fallback for demo
-                "location_text": "G-13",
-                "time_preference": "tomorrow morning",
-                "urgency": "medium",
-                "detected_language": "en"
-            }
+            logger.error(f"Error extracting or parsing intent: {e}", exc_info=True)
+
+        return None

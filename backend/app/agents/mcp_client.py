@@ -6,6 +6,7 @@ to invoke tools via the Model Context Protocol.
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import sys
@@ -29,7 +30,7 @@ class MCPClient:
 
     async def connect(self):
         """Initializes the connection to the MCP server."""
-        self._exit_stack = asyncio.AsyncExitStack()
+        self._exit_stack = contextlib.AsyncExitStack()
         read_stream, write_stream = await self._exit_stack.enter_async_context(
             stdio_client(self.server_params)
         )

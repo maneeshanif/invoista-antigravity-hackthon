@@ -1,7 +1,21 @@
 from fastapi import APIRouter
+from app.api.routes import (
+    requests,
+    traces,
+    providers,
+    bookings,
+    followups,
+    me,
+    admin
+)
 
 api_router = APIRouter()
 
-# TODO: Include specific routers here as they are developed
-# from app.api.routes import some_router
-# api_router.include_router(some_router.router, prefix="/some", tags=["some"])
+api_router.include_router(requests.router, prefix="/requests", tags=["Requests"])
+api_router.include_router(traces.router, prefix="/requests", tags=["Traces"]) # Shared prefix for sub-routes
+api_router.include_router(providers.router, prefix="/providers", tags=["Providers"])
+api_router.include_router(bookings.router, prefix="/bookings", tags=["Bookings"])
+api_router.include_router(followups.router, prefix="/followups", tags=["Followups"])
+api_router.include_router(me.router, prefix="/me", tags=["Me"])
+api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
+

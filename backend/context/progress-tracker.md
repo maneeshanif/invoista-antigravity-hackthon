@@ -8,7 +8,7 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Current Goal
 
-- Setup MCP server tools.
+- Connect backend API with frontend.
 
 ## Completed
 
@@ -21,14 +21,18 @@ Update this file whenever the current phase, active feature, or implementation s
 - Implement `Feature 03 - MCP Server` (`mcp_server/server.py`, `db.py`, and all 5 tools: `find_providers`, `rank_providers`, `create_booking`, `schedule_followups`, `write_trace_log`).
 - `context/feature-specs/04-agent-orchestrator.md` (Agent Orchestrator Spec)
 - Implement `Feature 04 - Agent Orchestrator` (Gemini-based workflow with MCP client and session management).
+- `context/feature-specs/05-agent-refactor-openaisdk.md` (Agent Layer Refactor — OpenAI Agents SDK)
+- Implement `Feature 05 - Agent Layer Refactor` (SDK-native multi-agent pipeline with Orchestrator + 4 specialist agents, stable SSE transport for MCP, and absolute .env path loading).
+- `context/feature-specs/06-backend-routes.md` (Backend API Routes Spec)
+- Implement `Feature 06 - Backend API Routes` (All 18 routes implemented, integrated with AgentOrchestrator).
 
 ## In Progress
 
-- Connect agents to tools and database (Refining individual agent prompts and error handling).
+- Connect backend API with frontend.
 
 ## Next Up
 
-- Connect agents to tools and database.
+- Connect backend API with frontend.
 
 ## Open Questions
 
@@ -43,3 +47,7 @@ Update this file whenever the current phase, active feature, or implementation s
 - MCP server is at `mcp_server/server.py`. Run with `uv run python -m mcp_server.server` or `mcp dev mcp_server/server.py`.
 - `SUPABASE_URL` must be set in `.env` for the DB client to initialise.
 - All 5 tools are pure functions in `mcp_server/tools/`; tested ranking logic independently.
+- Wrapped blocking Gemini `generate_content` call in `intent_agent.py` with `asyncio.to_thread` and `asyncio.wait_for` (10s timeout) to protect the event loop.
+- Removed hardcoded demo fallback from `intent_agent.py`; implemented module-level logging and proper `None` return on failure.
+- Updated `orchestrator.py` to gracefully handle failed intent extraction by failing the session instead of proceeding with fake data.
+- Fixed invalid `asyncio.AsyncExitStack` reference in `mcp_client.py` by switching to `contextlib.AsyncExitStack`.
