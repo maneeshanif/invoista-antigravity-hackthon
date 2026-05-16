@@ -5,7 +5,7 @@
 | Layer            | Technology          |
 | ---------------- | ------------------- |
 | Backend API      | FastAPI             |
-| Agent Runtime    | OpenAI Agents SDK   |
+| Agent Runtime    | Google Gemini (GenAI SDK) |
 | Tool Layer       | MCP Server          |
 | Database         | Supabase Postgres   |
 | Auth             | Clerk               |

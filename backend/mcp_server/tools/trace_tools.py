@@ -12,6 +12,27 @@ from pydantic import BaseModel, Field
 from mcp_server.db import supabase_client
 
 
+class CreateSessionInput(BaseModel):
+    user_id: str = Field(..., description="UUID of the user starting the session")
+    raw_input: str = Field(..., description="The user's initial raw request text")
+
+
+class CreateSessionOutput(BaseModel):
+    session_id: str
+    status: str
+
+
+class UpdateSessionInput(BaseModel):
+    session_id: str = Field(..., description="UUID of the session to update")
+    status: str = Field(..., description="New status, e.g. 'completed', 'failed'")
+    detected_language: str = Field(None, description="The language detected by the intent agent")
+
+
+class UpdateSessionOutput(BaseModel):
+    session_id: str
+    status: str
+
+
 class WriteTraceLogInput(BaseModel):
     session_id: str = Field(..., description="UUID of the session this trace belongs to")
     step: int = Field(..., ge=1, description="Ordered step number in the agent pipeline")
@@ -57,3 +78,44 @@ def write_trace_log(input: WriteTraceLogInput) -> WriteTraceLogOutput:
         session_id=row["session_id"],
         step=row["step"],
     )
+
+
+def create_session(input: CreateSessionInput) -> CreateSessionOutput:
+    """
+    Creates a new agent session in the database.
+    """
+    resp = (
+        supabase_client.table("sessions")
+        .insert(
+            {
+                "user_id": input.user_id,
+                "raw_input": input.raw_input,
+                "status": "in_progress",
+            }
+        )
+        .execute()
+    )
+    row = resp.data[0]
+    return CreateSessionOutput(session_id=row["id"], status=row["status"])
+
+
+def update_session_status(input: UpdateSessionInput) -> UpdateSessionOutput:
+    """
+    Updates the status and metadata of an existing session.
+    """
+    update_data = {"status": input.status}
+    if input.detected_language:
+        update_data["detected_language"] = input.detected_language
+    
+    if input.status in ["completed", "failed"]:
+        import datetime
+        update_data["completed_at"] = datetime.datetime.now().isoformat()
+
+    resp = (
+        supabase_client.table("sessions")
+        .update(update_data)
+        .eq("id", input.session_id)
+        .execute()
+    )
+    row = resp.data[0]
+    return UpdateSessionOutput(session_id=row["id"], status=row["status"])

@@ -19,10 +19,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Implement `Feature 02 - Database Setup` (Created Supabase schema and seed data migration).
 - `context/feature-specs/03-mcp-server.md` (MCP Server Spec)
 - Implement `Feature 03 - MCP Server` (`mcp_server/server.py`, `db.py`, and all 5 tools: `find_providers`, `rank_providers`, `create_booking`, `schedule_followups`, `write_trace_log`).
+- `context/feature-specs/04-agent-orchestrator.md` (Agent Orchestrator Spec)
+- Implement `Feature 04 - Agent Orchestrator` (Gemini-based workflow with MCP client and session management).
 
 ## In Progress
 
-- Connect Agent Orchestrator to MCP server tools.
+- Connect agents to tools and database (Refining individual agent prompts and error handling).
 
 ## Next Up
 

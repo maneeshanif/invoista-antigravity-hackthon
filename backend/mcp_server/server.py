@@ -37,8 +37,14 @@ from mcp_server.tools.ranking_tools import (
     rank_providers,
 )
 from mcp_server.tools.trace_tools import (
+    CreateSessionInput,
+    CreateSessionOutput,
+    UpdateSessionInput,
+    UpdateSessionOutput,
     WriteTraceLogInput,
     WriteTraceLogOutput,
+    create_session,
+    update_session_status,
     write_trace_log,
 )
 
@@ -102,6 +108,22 @@ def write_trace_log_tool(input: WriteTraceLogInput) -> WriteTraceLogOutput:
     to the trace_logs table for admin dashboard visibility.
     """
     return write_trace_log(input)
+
+
+@mcp.tool()
+def create_session_tool(input: CreateSessionInput) -> CreateSessionOutput:
+    """
+    Create a new user session in the database.
+    """
+    return create_session(input)
+
+
+@mcp.tool()
+def update_session_status_tool(input: UpdateSessionInput) -> UpdateSessionOutput:
+    """
+    Update the status and language of an existing session.
+    """
+    return update_session_status(input)
 
 
 # ---------------------------------------------------------------------------
