@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, Alert, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, Alert, Modal, ActivityIndicator } from 'react-native';
 import { useUser, useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { 
@@ -22,6 +22,8 @@ import { ServiceCard } from '@/components/home/ServiceCard';
 import { ActiveBookingCard } from '@/components/home/ActiveBookingCard';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { useApi } from '@/lib/useApi';
+import type { Provider } from '@/lib/api';
 
 const { width } = Dimensions.get('window');
 
@@ -30,49 +32,6 @@ const QUICK_ACTIONS = [
   { id: '2', label: 'Verified', icon: <ShieldCheck size={20} color="#00F3FF" />, desc: 'Top professionals' },
   { id: '3', label: 'Schedule', icon: <Clock size={20} color="#00F3FF" />, desc: 'Book for later' },
   { id: '4', label: 'Services', icon: <LayoutGrid size={20} color="#00F3FF" />, desc: 'Browse all' },
-];
-
-const MOCK_PROVIDERS = [
-  {
-    id: '1',
-    name: 'Elite Solutions Group',
-    category: 'Architecture',
-    rating: 4.95,
-    reviews: 420,
-    price: 'Rs. 5,000/hr',
-    distance: '0.8 km',
-    image: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=800',
-  },
-  {
-    id: '2',
-    name: 'Luxe Smart Systems',
-    category: 'Automation',
-    rating: 4.88,
-    reviews: 156,
-    price: 'Rs. 12,000/hr',
-    distance: '2.1 km',
-    image: 'https://images.unsplash.com/photo-1558002038-1055907df827?q=80&w=800',
-  },
-  {
-    id: '3',
-    name: 'Pro Plumbing Services',
-    category: 'Plumbing',
-    rating: 4.75,
-    reviews: 98,
-    price: 'Rs. 1,500/hr',
-    distance: '1.5 km',
-    image: 'https://images.unsplash.com/photo-1581244277943-fe4a9c777189?q=80&w=500',
-  },
-  {
-    id: '4',
-    name: 'Volt Masters',
-    category: 'Electric',
-    rating: 4.90,
-    reviews: 215,
-    price: 'Rs. 2,000/hr',
-    distance: '3.2 km',
-    image: 'https://images.unsplash.com/photo-1621905252507-b354bcadcabc?q=80&w=500',
-  },
 ];
 
 const CATEGORIES = [
@@ -87,8 +46,35 @@ export default function HomeScreen() {
   const { user } = useUser();
   const { signOut } = useAuth();
   const router = useRouter();
+  const { listProviders, createRequest } = useApi();
+
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [providers, setProviders] = useState<Provider[]>([]);
+  const [loadingProviders, setLoadingProviders] = useState(true);
+  const [submittingRequest, setSubmittingRequest] = useState(false);
+
+  // Fetch real providers whenever category changes
+  useEffect(() => {
+    let cancelled = false;
+    const fetchProviders = async () => {
+      setLoadingProviders(true);
+      try {
+        const data = await listProviders(
+          selectedCategory !== 'all' ? { category: selectedCategory } : {}
+        );
+        if (!cancelled) setProviders(data);
+      } catch (err) {
+        if (!cancelled) {
+          console.error('Failed to load providers:', err);
+        }
+      } finally {
+        if (!cancelled) setLoadingProviders(false);
+      }
+    };
+    fetchProviders();
+    return () => { cancelled = true; };
+  }, [selectedCategory]);
 
   const handleSignOutPress = () => {
     setShowLogoutModal(true);
@@ -107,16 +93,23 @@ export default function HomeScreen() {
     }
   };
 
-  const filteredProviders = selectedCategory === 'all' 
-    ? MOCK_PROVIDERS 
-    : MOCK_PROVIDERS.filter(p => p.category === selectedCategory);
-
-  const handleAIRequest = (text: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
-      pathname: '/request/[id]',
-      params: { id: 'req_' + Date.now(), query: text }
-    });
+  const handleAIRequest = async (text: string) => {
+    if (submittingRequest) return;
+    if (Platform.OS !== 'web') {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    }
+    setSubmittingRequest(true);
+    try {
+      const { session_id } = await createRequest({ message: text, user_id: user?.id });
+      router.push({
+        pathname: '/request/[id]',
+        params: { id: session_id, query: text }
+      });
+    } catch (err) {
+      Alert.alert('Error', 'Could not start request. Is the backend running?');
+    } finally {
+      setSubmittingRequest(false);
+    }
   };
 
   const displayName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 'Premium';
@@ -156,7 +149,13 @@ export default function HomeScreen() {
 
           {/* AI Search Bar - Floating Style */}
           <View style={styles.searchSection}>
-            <AIInput onSend={handleAIRequest} />
+            <AIInput onSend={handleAIRequest} disabled={submittingRequest} />
+            {submittingRequest && (
+              <View style={styles.requestingOverlay}>
+                <ActivityIndicator size="small" color="#00F3FF" />
+                <ThemedText style={styles.requestingText}>Starting AI session…</ThemedText>
+              </View>
+            )}
           </View>
 
           {/* Active Bookings - Executive Horizontal Scroll */}
@@ -225,25 +224,54 @@ export default function HomeScreen() {
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
               <ThemedText style={styles.sectionTitle}>Available Professionals</ThemedText>
-              <ThemedText style={styles.subtitleCount}>{filteredProviders.length} results</ThemedText>
+              {loadingProviders ? (
+                <ActivityIndicator size="small" color="#00F3FF" />
+              ) : (
+                <ThemedText style={styles.subtitleCount}>{providers.length} results</ThemedText>
+              )}
             </View>
             
-            {filteredProviders.map(provider => (
-              <ServiceCard
-                key={provider.id}
-                {...provider}
-                onBook={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  router.push({
-                    pathname: '/booking/[id]',
-                    params: { id: provider.id, name: provider.name, price: provider.price }
-                  });
-                }}
-                onView={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                }}
-              />
-            ))}
+            {loadingProviders ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color="#00F3FF" />
+                <ThemedText style={styles.loadingText}>Finding professionals…</ThemedText>
+              </View>
+            ) : providers.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <ThemedText style={styles.emptyText}>No professionals found in this category.</ThemedText>
+              </View>
+            ) : (
+              providers.map(provider => (
+                <ServiceCard
+                  key={provider.id}
+                  id={provider.id}
+                  name={provider.name}
+                  category={provider.category}
+                  rating={provider.rating}
+                  reviews={provider.jobs_completed}
+                  price={provider.price_range}
+                  distance={provider.area}
+                  onBook={() => {
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                    router.push({
+                      pathname: '/provider/[id]',
+                      params: {
+                        id: provider.id,
+                        name: provider.name,
+                        category: provider.category,
+                        rating: String(provider.rating),
+                        reviews: String(provider.jobs_completed),
+                        price: provider.price_range,
+                        distance: provider.area,
+                      }
+                    });
+                  }}
+                  onView={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  }}
+                />
+              ))
+            )}
           </View>
 
           <View style={{ height: 100 }} />
@@ -363,6 +391,18 @@ const styles = StyleSheet.create({
     backgroundColor: '#000000',
     paddingVertical: Spacing.sm,
   },
+  requestingOverlay: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingTop: Spacing.sm,
+    paddingHorizontal: Spacing.xs,
+  },
+  requestingText: {
+    fontSize: 12,
+    color: '#00F3FF',
+    fontFamily: Typography.fonts.medium,
+  },
   actionsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -439,16 +479,31 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     letterSpacing: -0.5,
   },
-  viewAllRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
+  subtitleCount: {
+    fontSize: 12,
+    color: Colors.dark.icon,
+    fontFamily: Typography.fonts.medium,
   },
-  viewAll: {
-    fontSize: 10,
-    color: Colors.dark.accent,
-    fontFamily: Typography.fonts.bold,
-    letterSpacing: 1,
+  horizontalScroll: {
+    gap: Spacing.md,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xxl,
+    gap: Spacing.md,
+  },
+  loadingText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: Typography.sizes.sm,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: Spacing.xl,
+  },
+  emptyText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: Typography.sizes.sm,
+    textAlign: 'center',
   },
   modalOverlay: {
     flex: 1,

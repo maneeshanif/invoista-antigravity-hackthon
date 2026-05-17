@@ -50,6 +50,11 @@ function InitialLayout() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
+      <Stack.Screen name="request/[id]" options={{ headerShown: true }} />
+      <Stack.Screen name="provider/[id]" options={{ headerShown: true }} />
+      <Stack.Screen name="provider/[sessionId]" options={{ headerShown: true }} />
+      <Stack.Screen name="booking/[id]" options={{ headerShown: true }} />
+      <Stack.Screen name="admin" options={{ headerShown: false }} />
     </Stack>
   );
 }

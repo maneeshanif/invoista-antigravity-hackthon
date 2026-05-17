@@ -1,180 +1,360 @@
-import React, { useState } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { PremiumButton } from '@/components/shared/PremiumButton';
-import { Calendar, Clock, MapPin, CreditCard, ChevronLeft } from 'lucide-react-native';
+import { Calendar, MapPin, CreditCard, ChevronLeft, CheckCircle2, AlertCircle, XCircle } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
+import { useApi } from '@/lib/useApi';
+import type { Booking, Provider } from '@/lib/api';
 
-const TIME_SLOTS = ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM', '06:00 PM'];
+function formatDate(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-PK', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  } catch {
+    return iso;
+  }
+}
+
+function formatTime(iso: string): string {
+  try {
+    const d = new Date(iso);
+    return d.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+  } catch {
+    return '';
+  }
+}
 
 export default function BookingScreen() {
-  const { id, name, price } = useLocalSearchParams();
+  const { id: bookingId } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [selectedTime, setSelectedTime] = useState('');
-  const [isSuccess, setIsSuccess] = useState(false);
+  const { getBooking, getProvider, cancelBooking } = useApi();
 
-  const handleConfirm = () => {
-    if (!selectedTime) {
-      alert('Please select a time slot');
-      return;
-    }
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    setIsSuccess(true);
+  const [booking, setBooking] = useState<Booking | null>(null);
+  const [provider, setProvider] = useState<Provider | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const b = await getBooking(bookingId);
+        setBooking(b);
+        const p = await getProvider(b.provider_id);
+        setProvider(p);
+      } catch (e: any) {
+        console.error('Booking load error:', e);
+        setError(e.message ?? 'Failed to load booking.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [bookingId]);
+
+  const handleCancelBooking = () => {
+    Alert.alert(
+      'Cancel Booking',
+      'Are you sure you want to cancel this booking?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Cancel Booking',
+          style: 'destructive',
+          onPress: async () => {
+            setCancelling(true);
+            try {
+              const updated = await cancelBooking(bookingId);
+              setBooking(updated);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Could not cancel booking.');
+            } finally {
+              setCancelling(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
-  if (isSuccess) {
+  if (loading) {
     return (
       <ThemedView style={styles.container}>
-        <View style={styles.successContent}>
-          <View style={styles.successIcon}>
-            <ThemedText style={{ fontSize: 40 }}>✅</ThemedText>
-          </View>
-          <ThemedText style={styles.successTitle}>Booking Confirmed!</ThemedText>
-          <ThemedText style={styles.successSub}>Your request for {name} has been sent. The provider will arrive shortly.</ThemedText>
-          <PremiumButton 
-            title="Go to My Requests" 
-            onPress={() => router.replace('/(tabs)')}
-            style={styles.confirmButton}
-          />
+        <Stack.Screen options={{ title: 'Booking', headerTransparent: true, headerTintColor: '#fff' }} />
+        <View style={styles.centerContent}>
+          <ActivityIndicator size="large" color={Colors.dark.accent} />
+          <ThemedText style={styles.loadingText}>Loading booking…</ThemedText>
         </View>
       </ThemedView>
     );
   }
 
+  if (error || !booking) {
+    return (
+      <ThemedView style={styles.container}>
+        <Stack.Screen options={{ title: 'Booking', headerTransparent: true, headerTintColor: '#fff' }} />
+        <View style={styles.centerContent}>
+          <AlertCircle size={48} color="#FF4B4B" />
+          <ThemedText style={styles.errorTitle}>Could Not Load Booking</ThemedText>
+          <ThemedText style={styles.errorSubtitle}>{error ?? 'Booking not found.'}</ThemedText>
+          <TouchableOpacity style={styles.goHomeButton} onPress={() => router.replace('/(tabs)')}>
+            <ThemedText style={styles.goHomeText}>Go Home</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </ThemedView>
+    );
+  }
+
+  const isConfirmed = booking.status === 'confirmed';
+
   return (
     <ThemedView style={styles.container}>
-      <Stack.Screen options={{ 
-        title: 'Complete Booking', 
-        headerTransparent: true, 
-        headerTintColor: '#fff',
-        headerLeft: () => (
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft color="#FFF" size={24} />
-          </TouchableOpacity>
-        )
-      }} />
-      
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <ThemedText style={styles.headerTitle}>Review & Confirm</ThemedText>
-        
-        {/* Professional Details Card */}
+      <Stack.Screen
+        options={{
+          title: 'Booking Confirmation',
+          headerTransparent: true,
+          headerTintColor: '#fff',
+          headerLeft: () => (
+            <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+              <ChevronLeft color="#FFF" size={24} />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Status Hero */}
+        <View style={styles.statusHero}>
+          <View style={[styles.statusIcon, !isConfirmed && styles.statusIconCancelled]}>
+            {isConfirmed
+              ? <CheckCircle2 size={40} color="#10B981" />
+              : <XCircle size={40} color="#FF4B4B" />
+            }
+          </View>
+          <ThemedText style={styles.statusTitle}>
+            {isConfirmed ? 'Booking Confirmed!' : 'Booking Cancelled'}
+          </ThemedText>
+          <View style={[styles.statusBadge, !isConfirmed && styles.statusBadgeCancelled]}>
+            <ThemedText style={[styles.statusBadgeText, !isConfirmed && styles.statusBadgeTextCancelled]}>
+              {booking.status.toUpperCase()}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* Confirmation Code */}
+        <GlassCard style={styles.codeCard}>
+          <ThemedText style={styles.codeLabel}>CONFIRMATION CODE</ThemedText>
+          <ThemedText style={styles.codeValue}>{booking.confirmation_code}</ThemedText>
+        </GlassCard>
+
+        {/* Provider Details */}
+        {provider && (
+          <GlassCard style={styles.infoCard}>
+            <ThemedText style={styles.sectionLabel}>PROVIDER</ThemedText>
+            <ThemedText style={styles.providerName}>{provider.name}</ThemedText>
+            <ThemedText style={styles.providerCategory}>{provider.category}</ThemedText>
+            <View style={styles.priceRow}>
+              <ThemedText style={styles.priceLabel}>Price Range:</ThemedText>
+              <ThemedText style={styles.priceValue}>{provider.price_range}</ThemedText>
+            </View>
+            <View style={styles.locationRow}>
+              <MapPin size={14} color="rgba(255,255,255,0.4)" />
+              <ThemedText style={styles.locationText}>{provider.area}</ThemedText>
+            </View>
+          </GlassCard>
+        )}
+
+        {/* Booking Details */}
         <GlassCard style={styles.infoCard}>
-          <ThemedText style={styles.sectionLabel}>PROVIDER</ThemedText>
-          <ThemedText style={styles.providerName}>{name}</ThemedText>
-          <View style={styles.priceRow}>
-            <ThemedText style={styles.priceLabel}>Rate:</ThemedText>
-            <ThemedText style={styles.priceValue}>{price}</ThemedText>
+          <ThemedText style={styles.sectionLabel}>BOOKING DETAILS</ThemedText>
+
+          <View style={styles.detailRow}>
+            <Calendar size={16} color={Colors.dark.accent} />
+            <View style={styles.detailContent}>
+              <ThemedText style={styles.detailLabel}>Date Booked</ThemedText>
+              <ThemedText style={styles.detailValue}>{formatDate(booking.booked_at)}</ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.detailRow}>
+            <CreditCard size={16} color={Colors.dark.accent} />
+            <View style={styles.detailContent}>
+              <ThemedText style={styles.detailLabel}>Payment</ThemedText>
+              <ThemedText style={styles.detailValue}>Cash on Service</ThemedText>
+            </View>
           </View>
         </GlassCard>
 
-        {/* Schedule Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Calendar size={18} color={Colors.dark.accent} />
-            <ThemedText style={styles.sectionTitle}>Select Schedule</ThemedText>
-          </View>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.timeSlots}>
-            {TIME_SLOTS.map(time => (
-              <TouchableOpacity 
-                key={time} 
-                style={[styles.timeChip, selectedTime === time && styles.activeTimeChip]}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setSelectedTime(time);
-                }}
-              >
-                <ThemedText style={[styles.timeText, selectedTime === time && styles.activeTimeText]}>{time}</ThemedText>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+        {/* Actions */}
+        <View style={styles.actions}>
+          <PremiumButton
+            title="Go to My Requests"
+            onPress={() => router.replace('/(tabs)')}
+            style={styles.homeBtn}
+          />
+
+          {isConfirmed && (
+            <TouchableOpacity
+              style={[styles.cancelBtn, cancelling && styles.cancelBtnDisabled]}
+              onPress={handleCancelBooking}
+              disabled={cancelling}
+            >
+              {cancelling
+                ? <ActivityIndicator size="small" color="#FF4B4B" />
+                : <ThemedText style={styles.cancelBtnText}>Cancel Booking</ThemedText>
+              }
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Location Section */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <MapPin size={18} color={Colors.dark.accent} />
-            <ThemedText style={styles.sectionTitle}>Service Location</ThemedText>
-          </View>
-          <GlassCard style={styles.locationCard}>
-            <ThemedText style={styles.addressText}>DHA Phase 6, Karachi, Pakistan</ThemedText>
-            <TouchableOpacity><ThemedText style={styles.changeText}>CHANGE</ThemedText></TouchableOpacity>
-          </GlassCard>
-        </View>
-
-        {/* Payment Preview */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <CreditCard size={18} color={Colors.dark.accent} />
-            <ThemedText style={styles.sectionTitle}>Payment Method</ThemedText>
-          </View>
-          <View style={styles.paymentRow}>
-            <ThemedText style={styles.paymentText}>Cash on Service</ThemedText>
-            <CheckCircle size={18} color="#10B981" />
-          </View>
-        </View>
-
-        <PremiumButton 
-          title="Confirm Booking" 
-          onPress={handleConfirm}
-          style={styles.confirmButton}
-        />
+        <View style={{ height: 60 }} />
       </ScrollView>
     </ThemedView>
   );
 }
-
-// Dummy CheckCircle since it wasn't imported
-const CheckCircle = ({ size, color }: any) => (
-  <View style={{ width: size, height: size, borderRadius: size/2, backgroundColor: color, justifyContent: 'center', alignItems: 'center' }}>
-    <ThemedText style={{ color: '#000', fontSize: 10 }}>✓</ThemedText>
-  </View>
-);
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000',
   },
+  centerContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.xl,
+    gap: Spacing.md,
+  },
+  loadingText: {
+    color: 'rgba(255,255,255,0.5)',
+  },
+  errorTitle: {
+    fontSize: Typography.sizes.xl,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFF',
+    textAlign: 'center',
+  },
+  errorSubtitle: {
+    color: 'rgba(255,255,255,0.5)',
+    textAlign: 'center',
+  },
+  goHomeButton: {
+    backgroundColor: Colors.dark.accent,
+    paddingHorizontal: Spacing.xl,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.full,
+  },
+  goHomeText: {
+    color: '#000',
+    fontFamily: Typography.fonts.bold,
+  },
+  backButton: {
+    marginLeft: Spacing.sm,
+  },
   scrollContent: {
     padding: Spacing.lg,
     paddingTop: 100,
   },
-  headerTitle: {
+  statusHero: {
+    alignItems: 'center',
+    marginBottom: Spacing.xl,
+  },
+  statusIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  statusIconCancelled: {
+    backgroundColor: 'rgba(255, 75, 75, 0.1)',
+    borderColor: 'rgba(255, 75, 75, 0.2)',
+  },
+  statusTitle: {
     fontSize: Typography.sizes.xxl,
     fontFamily: Typography.fonts.bold,
     color: '#FFF',
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.sm,
   },
-  backButton: {
-    marginLeft: Spacing.md,
-    marginTop: 10,
+  statusBadge: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderRadius: Radius.full,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  statusBadgeCancelled: {
+    backgroundColor: 'rgba(255, 75, 75, 0.15)',
+    borderColor: 'rgba(255, 75, 75, 0.3)',
+  },
+  statusBadgeText: {
+    fontSize: 11,
+    fontFamily: Typography.fonts.bold,
+    color: '#10B981',
+    letterSpacing: 1,
+  },
+  statusBadgeTextCancelled: {
+    color: '#FF4B4B',
+  },
+  codeCard: {
+    padding: Spacing.lg,
+    marginBottom: Spacing.md,
+    alignItems: 'center',
+    borderRadius: Radius.xl,
+    borderColor: 'rgba(0, 243, 255, 0.2)',
+    borderWidth: 1,
+  },
+  codeLabel: {
+    fontSize: 10,
+    fontFamily: Typography.fonts.bold,
+    color: Colors.dark.accent,
+    letterSpacing: 2,
+    marginBottom: Spacing.xs,
+  },
+  codeValue: {
+    fontSize: 28,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFF',
+    letterSpacing: 4,
   },
   infoCard: {
     padding: Spacing.lg,
-    marginBottom: Spacing.xl,
-    borderRadius: Radius.lg,
+    marginBottom: Spacing.md,
+    borderRadius: Radius.xl,
   },
   sectionLabel: {
     fontSize: 10,
     fontFamily: Typography.fonts.bold,
     color: Colors.dark.accent,
     letterSpacing: 1.5,
-    marginBottom: 4,
+    marginBottom: Spacing.sm,
   },
   providerName: {
     fontSize: Typography.sizes.xl,
     fontFamily: Typography.fonts.bold,
     color: '#FFF',
   },
+  providerCategory: {
+    fontSize: Typography.sizes.sm,
+    color: 'rgba(255,255,255,0.5)',
+    marginBottom: Spacing.sm,
+  },
   priceRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.sm,
     gap: 8,
+    alignItems: 'center',
+    marginBottom: 4,
   },
   priceLabel: {
     color: 'rgba(255,255,255,0.4)',
@@ -183,102 +363,59 @@ const styles = StyleSheet.create({
   priceValue: {
     color: '#FFF',
     fontFamily: Typography.fonts.bold,
+    fontSize: Typography.sizes.sm,
   },
-  section: {
-    marginBottom: Spacing.xl,
-  },
-  sectionHeader: {
+  locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
+  },
+  locationText: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: Typography.sizes.sm,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: Spacing.sm,
     marginBottom: Spacing.md,
   },
-  sectionTitle: {
-    fontSize: Typography.sizes.md,
-    fontFamily: Typography.fonts.bold,
-    color: '#FFF',
+  detailContent: {
+    flex: 1,
   },
-  timeSlots: {
-    gap: Spacing.sm,
+  detailLabel: {
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.4)',
+    marginBottom: 2,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  timeChip: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: Radius.md,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
-    marginRight: Spacing.sm,
-  },
-  activeTimeChip: {
-    backgroundColor: Colors.dark.accent,
-    borderColor: Colors.dark.accent,
-  },
-  timeText: {
-    color: 'rgba(255,255,255,0.6)',
-    fontFamily: Typography.fonts.medium,
-  },
-  activeTimeText: {
-    color: '#000',
-    fontFamily: Typography.fonts.bold,
-  },
-  locationCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-  },
-  addressText: {
-    color: '#FFF',
+  detailValue: {
     fontSize: Typography.sizes.sm,
-    flex: 1,
-  },
-  changeText: {
-    color: Colors.dark.accent,
-    fontSize: 10,
-    fontFamily: Typography.fonts.bold,
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: Spacing.md,
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    borderRadius: Radius.md,
-  },
-  paymentText: {
-    color: '#FFF',
     fontFamily: Typography.fonts.medium,
-  },
-  confirmButton: {
-    height: 56,
-    marginTop: Spacing.xl,
-  },
-  successContent: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.xl,
-  },
-  successIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.xl,
-  },
-  successTitle: {
-    fontSize: Typography.sizes.xxl,
-    fontFamily: Typography.fonts.bold,
     color: '#FFF',
-    marginBottom: Spacing.sm,
   },
-  successSub: {
+  actions: {
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  homeBtn: {
+    height: 56,
+  },
+  cancelBtn: {
+    height: 48,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 75, 75, 0.4)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cancelBtnDisabled: {
+    opacity: 0.5,
+  },
+  cancelBtnText: {
+    color: '#FF4B4B',
+    fontFamily: Typography.fonts.bold,
     fontSize: Typography.sizes.md,
-    color: 'rgba(255,255,255,0.6)',
-    textAlign: 'center',
-    marginBottom: Spacing.xxl,
   },
 });

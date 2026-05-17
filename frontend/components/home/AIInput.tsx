@@ -9,9 +9,10 @@ import * as Haptics from 'expo-haptics';
 interface AIInputProps {
   onSend: (text: string) => void;
   loading?: boolean;
+  disabled?: boolean;
 }
 
-export const AIInput = ({ onSend, loading }: AIInputProps) => {
+export const AIInput = ({ onSend, loading, disabled }: AIInputProps) => {
   const [text, setText] = useState('');
   const glowAnim = React.useRef(new Animated.Value(0)).current;
 
@@ -62,9 +63,9 @@ export const AIInput = ({ onSend, loading }: AIInputProps) => {
             selectionColor={Colors.dark.accent}
           />
           <TouchableOpacity 
-            style={[styles.sendButton, !text.trim() && styles.disabled]} 
+            style={[styles.sendButton, (!text.trim() || disabled) && styles.disabled]} 
             onPress={handleSend}
-            disabled={!text.trim() || loading}
+            disabled={!text.trim() || loading || disabled}
           >
             <Send size={20} color="#FFFFFF" />
           </TouchableOpacity>
