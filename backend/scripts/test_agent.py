@@ -3,13 +3,13 @@ import json
 import asyncio
 
 async def test_agent():
-    url = "http://localhost:8000/api/v1/requests"
+    url = "http://localhost:8000/api/v1/requests/"
     payload = {
-        "user_request": "I need a plumber in G-13 tomorrow morning for a leaky pipe"
+        "message": "I need a AC Technician in G-13 Islamabad tomorrow morning for AC repair"
     }
     
     print(f"Sending request to {url}...")
-    print(f"Request: {payload['user_request']}")
+    print(f"Request: {payload['message']}")
     
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:

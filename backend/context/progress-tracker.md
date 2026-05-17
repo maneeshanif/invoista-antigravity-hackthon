@@ -25,6 +25,9 @@ Update this file whenever the current phase, active feature, or implementation s
 - Implement `Feature 05 - Agent Layer Refactor` (SDK-native multi-agent pipeline with Orchestrator + 4 specialist agents, stable SSE transport for MCP, and absolute .env path loading).
 - `context/feature-specs/06-backend-routes.md` (Backend API Routes Spec)
 - Implement `Feature 06 - Backend API Routes` (All 18 routes implemented, integrated with AgentOrchestrator).
+- Implement `Feature 07 - Test Suite` (Comprehensive tests for API endpoints, AI agents, and MCP server tools using pytest).
+- `context/feature-specs/08-hooks-implementation.md` (Hooks Implementation Spec)
+- Implement `Feature 08 - Hooks Implementation` (TraceRunHooks and TraceAgentHooks implemented).
 
 ## In Progress
 
@@ -32,6 +35,8 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Next Up
 
+- Run `supabase/refresh_slots.sql` in Supabase SQL Editor to seed fresh demo slots.
+- Test full orchestrator workflow end-to-end after slot refresh.
 - Connect backend API with frontend.
 
 ## Open Questions
@@ -41,6 +46,8 @@ Update this file whenever the current phase, active feature, or implementation s
 ## Architecture Decisions
 
 - Extracted agent reasoning and tooling through MCP server to separate the agent runtime from API logic.
+- Orchestrator Agent does NOT have `mcp_servers` — only its sub-agents (Discovery, Ranking, Booking, Followup) have direct MCP access. This prevents tool confusion where the Orchestrator could bypass sub-agents.
+- Session lifecycle (create/update) and trace logging are handled in code + hooks, NOT by LLM tool calls. This avoids wasted LLM turns and duplicate DB records.
 
 ## Session Notes
 
@@ -51,3 +58,4 @@ Update this file whenever the current phase, active feature, or implementation s
 - Removed hardcoded demo fallback from `intent_agent.py`; implemented module-level logging and proper `None` return on failure.
 - Updated `orchestrator.py` to gracefully handle failed intent extraction by failing the session instead of proceeding with fake data.
 - Fixed invalid `asyncio.AsyncExitStack` reference in `mcp_client.py` by switching to `contextlib.AsyncExitStack`.
+- **Fixed orchestrator workflow halt**: Root cause was 5-fold — (1) empty slots due to stale dates, (2) Orchestrator had both MCP + sub-agent tools (11 tools total), (3) duplicate session creation, (4) wasted turns on trace-log tool calls, (5) Gemini returning empty output. Fixed by removing MCP from Orchestrator, simplifying prompt to 4 steps, adding today's date to context, and creating `supabase/refresh_slots.sql`.

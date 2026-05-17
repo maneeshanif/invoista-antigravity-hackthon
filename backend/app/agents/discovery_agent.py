@@ -6,7 +6,6 @@ from agents.mcp import MCPServerSse
 from app.agents.llm_client import get_model
 from app.agents.prompts import DISCOVERY_AGENT_PROMPT
 
-
 def create_discovery_agent(mcp: MCPServerSse) -> Agent:
     """
     Creates a specialist Discovery Agent.

@@ -8,11 +8,13 @@ from app.agents.orchestrator import run_workflow
 
 router = APIRouter()
 
-async def run_orchestrator_task(user_input: str, user_id: str):
+async def run_orchestrator_task(user_input: str, user_id: str, session_id: str):
     try:
-        await run_workflow(user_input, user_id)
+        await run_workflow(user_input, user_id, session_id)
     except Exception as e:
+        import traceback
         print(f"Orchestrator task failed: {e}")
+        traceback.print_exc()
 
 @router.post("/", response_model=RequestResponse)
 async def create_request(req: RequestCreate, background_tasks: BackgroundTasks):
@@ -23,7 +25,7 @@ async def create_request(req: RequestCreate, background_tasks: BackgroundTasks):
     session_id = str(uuid.uuid4())
     
     # Start the orchestrator in the background
-    background_tasks.add_task(run_orchestrator_task, req.message, user_id)
+    background_tasks.add_task(run_orchestrator_task, req.message, user_id, session_id)
     
     return RequestResponse(session_id=session_id, status="started")
 
