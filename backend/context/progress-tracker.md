@@ -25,6 +25,9 @@ Update this file whenever the current phase, active feature, or implementation s
 - Implement `Feature 05 - Agent Layer Refactor` (SDK-native multi-agent pipeline with Orchestrator + 4 specialist agents, stable SSE transport for MCP, and absolute .env path loading).
 - `context/feature-specs/06-backend-routes.md` (Backend API Routes Spec)
 - Implement `Feature 06 - Backend API Routes` (All 18 routes implemented, integrated with AgentOrchestrator).
+- Implement `Feature 07 - Test Suite` (Comprehensive tests for API endpoints, AI agents, and MCP server tools using pytest).
+- `context/feature-specs/08-hooks-implementation.md` (Hooks Implementation Spec)
+- Implement `Feature 08 - Hooks Implementation` (TraceRunHooks and TraceAgentHooks implemented).
 
 ## In Progress
 

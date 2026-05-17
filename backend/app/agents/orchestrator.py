@@ -11,9 +11,12 @@ Architecture:
 
 from agents import Agent, Runner, RunConfig , enable_verbose_stdout_logging
 from agents.mcp import MCPServerSse
+import asyncio
 from openai import APIStatusError
 
 from app.agents.llm_client import get_model, get_fallback_model
+from app.agents.hooks import TraceRunHooks, TraceAgentHooks
+from mcp_server.tools.trace_tools import create_session, CreateSessionInput, update_session_status, UpdateSessionInput
 from app.agents.prompts import (
     ORCHESTRATOR_PROMPT, 
     DISCOVERY_AGENT_PROMPT, 
@@ -31,7 +34,7 @@ from app.core.config import settings
 enable_verbose_stdout_logging()
 
 
-async def run_workflow(user_input: str, user_id: str) -> dict:
+async def run_workflow(user_input: str, user_id: str, session_id: str) -> dict:
     """
     Entry point for the full agent pipeline.
 
@@ -44,9 +47,14 @@ async def run_workflow(user_input: str, user_id: str) -> dict:
     ) as mcp:
         # Step 0: Create Session
         print(f"Creating session for input: {user_input[:20]}...")
-        # Note: We need to use mcp.call_tool but the SDK might have a different way.
-        # For now, let's assume we can use the mcp object.
-        # Actually, let's keep it simple and focus on the requested fix.
+        await asyncio.to_thread(create_session, CreateSessionInput(
+            user_id=user_id,
+            raw_input=user_input,
+            session_id=session_id
+        ))
+        
+        trace_run_hooks = TraceRunHooks(session_id=session_id)
+        trace_agent_hooks = TraceAgentHooks(session_id=session_id)
 
         # --- Initial Message for the Orchestrator ---
         initial_message = (
@@ -59,9 +67,13 @@ async def run_workflow(user_input: str, user_id: str) -> dict:
             # --- Try with Primary Model (OpenAI) ---
             # Build sub-agents
             discovery_agent = create_discovery_agent(mcp)
+            discovery_agent.hooks = trace_agent_hooks
             ranking_agent   = create_ranking_agent(mcp)
+            ranking_agent.hooks = trace_agent_hooks
             booking_agent   = create_booking_agent(mcp)
+            booking_agent.hooks = trace_agent_hooks
             followup_agent  = create_followup_agent(mcp)
+            followup_agent.hooks = trace_agent_hooks
 
             # Wrap as tools
             tools = [
@@ -77,12 +89,20 @@ async def run_workflow(user_input: str, user_id: str) -> dict:
                 model=get_model(),
                 tools=tools,
                 mcp_servers=[mcp],
+                hooks=trace_agent_hooks,
             )
             result = await Runner.run(
                 orchestrator,
                 input=initial_message,
+                hooks=trace_run_hooks,
                 run_config=RunConfig(tracing_disabled=True),
             )
+            
+            await asyncio.to_thread(update_session_status, UpdateSessionInput(
+                session_id=session_id,
+                status="completed"
+            ))
+
         except (APIStatusError, ValueError) as e:
             # --- Fallback to Gemini if OpenAI fails OR key is missing ---
             print(f"DEBUG: OpenAI initialization failed or API error: {e}")
@@ -93,7 +113,7 @@ async def run_workflow(user_input: str, user_id: str) -> dict:
             # For simplicity, we just create new agents with fallback model
             
             def create_fallback_agent(name, instructions):
-                return Agent(name=name, instructions=instructions, model=get_fallback_model(), mcp_servers=[mcp])
+                return Agent(name=name, instructions=instructions, model=get_fallback_model(), mcp_servers=[mcp], hooks=trace_agent_hooks)
 
             f_discovery = create_fallback_agent("DiscoveryAgent", DISCOVERY_AGENT_PROMPT)
             f_ranking   = create_fallback_agent("RankingAgent", RANKING_AGENT_PROMPT)
@@ -113,12 +133,25 @@ async def run_workflow(user_input: str, user_id: str) -> dict:
                 model=get_fallback_model(),
                 tools=fallback_tools,
                 mcp_servers=[mcp],
+                hooks=trace_agent_hooks,
             )
             result = await Runner.run(
                 orchestrator_fallback,
                 input=initial_message,
+                hooks=trace_run_hooks,
                 run_config=RunConfig(tracing_disabled=True),
             )
+            
+            await asyncio.to_thread(update_session_status, UpdateSessionInput(
+                session_id=session_id,
+                status="completed"
+            ))
+        except Exception as e:
+            await asyncio.to_thread(update_session_status, UpdateSessionInput(
+                session_id=session_id,
+                status="failed"
+            ))
+            raise e
 
         return {
             "status": "success",
