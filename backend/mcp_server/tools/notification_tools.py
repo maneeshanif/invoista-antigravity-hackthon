@@ -15,10 +15,8 @@ from mcp_server.db import supabase_client
 class ScheduleFollowupsInput(BaseModel):
     booking_id: str = Field(..., description="UUID of the booking to schedule follow-ups for")
     user_id: str = Field(..., description="UUID of the user who placed the booking")
-    slot_datetime: datetime = Field(
-        ...,
-        description="The exact datetime of the booked slot (UTC) used to compute reminder timing",
-    )
+    slot_date: str = Field(..., description="Date of the slot (YYYY-MM-DD)")
+    slot_time: str = Field(..., description="Time of the slot (e.g. '09:00 AM')")
 
 
 class ScheduledNotification(BaseModel):
@@ -39,7 +37,16 @@ def schedule_followups(input: ScheduleFollowupsInput) -> ScheduleFollowupsOutput
 
     Celery workers poll the notifications table and send these at the appropriate time.
     """
-    slot_dt = input.slot_datetime.replace(tzinfo=timezone.utc) if input.slot_datetime.tzinfo is None else input.slot_datetime
+    # Parse date and time strings into a single datetime
+    # Expected format: slot_date="2026-05-18", slot_time="09:00 AM"
+    try:
+        slot_dt = datetime.strptime(f"{input.slot_date} {input.slot_time}", "%Y-%m-%d %I:%M %p")
+        slot_dt = slot_dt.replace(tzinfo=timezone.utc)
+    except ValueError:
+        # Fallback if time format is weird
+        from datetime import date
+        d = date.fromisoformat(input.slot_date)
+        slot_dt = datetime(d.year, d.month, d.day, 12, 0, tzinfo=timezone.utc)
 
     notifications_to_insert = [
         {

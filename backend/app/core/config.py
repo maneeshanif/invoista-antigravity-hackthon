@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = ""
     GEMINI_API_KEY: str = ""
     GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    
+    HF_TOKEN: str = ""
+    HF_BASE_URL: str = "https://router.huggingface.co/v1"
 
     MCP_SERVER_URL: str = "http://localhost:8001/sse"
     MCP_PORT: int = 8001

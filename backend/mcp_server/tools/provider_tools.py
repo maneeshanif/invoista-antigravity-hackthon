@@ -3,6 +3,10 @@ provider_tools.py — MCP tool: find_providers
 
 Queries Supabase for providers matching the requested service type and area,
 and fetches their available (non-booked) slots for the given date.
+
+Area matching is intentionally flexible: only the first token of the area string
+(split on space or comma) is used in the ILIKE query, so 'G-13 Islamabad',
+'G-13, Islamabad', and 'G-13' all produce the same search.
 """
 
 from datetime import date
@@ -42,16 +46,28 @@ class FindProvidersOutput(BaseModel):
     total_found: int
 
 
+def _extract_area_token(area: str) -> str:
+    """Extract the first meaningful area token (e.g. 'G-13' from 'G-13 Islamabad')."""
+    import re
+    # Split on comma or whitespace, return first non-empty part
+    parts = re.split(r"[,\s]+", area.strip())
+    return parts[0] if parts else area
+
+
 def find_providers(input: FindProvidersInput) -> FindProvidersOutput:
     """
     Queries the database to find providers matching the service type and area,
     along with their available (un-booked) slots for the requested date.
+
+    Area matching uses only the first token of the area string so that
+    'G-13 Islamabad', 'G-13, Islamabad', and 'G-13' all match correctly.
     """
+    area_token = _extract_area_token(input.area)
     providers_resp = (
         supabase_client.table("providers")
         .select("*")
         .ilike("category", f"%{input.service_type}%")
-        .ilike("area", f"%{input.area}%")
+        .ilike("area", f"%{area_token}%")
         .eq("is_active", True)
         .execute()
     )

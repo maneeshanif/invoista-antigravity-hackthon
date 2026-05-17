@@ -12,7 +12,9 @@ async def run_orchestrator_task(user_input: str, user_id: str, session_id: str):
     try:
         await run_workflow(user_input, user_id, session_id)
     except Exception as e:
+        import traceback
         print(f"Orchestrator task failed: {e}")
+        traceback.print_exc()
 
 @router.post("/", response_model=RequestResponse)
 async def create_request(req: RequestCreate, background_tasks: BackgroundTasks):
