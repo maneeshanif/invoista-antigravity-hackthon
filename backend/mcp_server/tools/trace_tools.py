@@ -83,7 +83,7 @@ def write_trace_log(input: WriteTraceLogInput) -> WriteTraceLogOutput:
 
 def create_session(input: CreateSessionInput) -> CreateSessionOutput:
     """
-    Creates a new agent session in the database.
+    Creates or updates an agent session in the database safely (idempotently).
     """
     session_data = {
         "user_id": input.user_id,
@@ -93,9 +93,10 @@ def create_session(input: CreateSessionInput) -> CreateSessionOutput:
     if input.session_id:
         session_data["id"] = input.session_id
 
+    # Use upsert to avoid primary key violations
     resp = (
         supabase_client.table("sessions")
-        .insert(session_data)
+        .upsert(session_data, on_conflict="id")
         .execute()
     )
     row = resp.data[0]

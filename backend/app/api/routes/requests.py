@@ -8,6 +8,8 @@ from app.agents.orchestrator import run_workflow
 from fastapi import Depends
 from app.api.dependencies import get_current_user
 
+from mcp_server.tools.trace_tools import create_session, CreateSessionInput
+
 router = APIRouter()
 
 async def run_orchestrator_task(user_input: str, user_id: str, session_id: str):
@@ -25,6 +27,13 @@ async def create_request(req: RequestCreate, background_tasks: BackgroundTasks, 
     """
     user_id = str(current_user.id)
     session_id = str(uuid.uuid4())
+    
+    # Synchronously write the session row to DB
+    create_session(CreateSessionInput(
+        user_id=user_id,
+        raw_input=req.message,
+        session_id=session_id
+    ))
     
     # Start the orchestrator in the background
     background_tasks.add_task(run_orchestrator_task, req.message, user_id, session_id)

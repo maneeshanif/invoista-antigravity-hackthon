@@ -3,8 +3,26 @@ from fastapi.testclient import TestClient
 from unittest.mock import patch, MagicMock
 import uuid
 from app.main import app
+from app.api.dependencies import get_current_user
+from app.db.schemas import User
 
 client = TestClient(app)
+
+@pytest.fixture(autouse=True)
+def override_auth():
+    app.dependency_overrides[get_current_user] = lambda: User(
+        id=uuid.UUID("11111111-1111-1111-1111-111111111111"),
+        clerk_user_id="clerk-test-id",
+        name="Test User",
+        phone="123456",
+        role="user",
+        preferred_language="en",
+        area="G-13",
+        lat=33.0,
+        lng=72.0
+    )
+    yield
+    app.dependency_overrides.clear()
 
 def test_health_check():
     response = client.get("/health")
@@ -12,8 +30,9 @@ def test_health_check():
     assert response.json() == {"status": "ok", "version": "0.1.0"}
 
 def test_create_request():
-    # Mock run_workflow to avoid real LLM/MCP calls
-    with patch("app.api.routes.requests.run_workflow") as mock_run_workflow:
+    # Mock run_workflow and create_session to avoid real LLM/MCP/DB calls
+    with patch("app.api.routes.requests.run_workflow") as mock_run_workflow, \
+         patch("app.api.routes.requests.create_session") as mock_create_session:
         mock_run_workflow.return_value = {"status": "completed", "session_id": "test-uuid", "summary": "done"}
         
         response = client.post(
@@ -32,15 +51,15 @@ def test_get_request_status(mock_supabase):
     session_id = str(uuid.uuid4())
     user_id = str(uuid.uuid4())
     mock_response = MagicMock()
-    mock_response.data = {
+    mock_response.data = [{
         "id": session_id,
         "user_id": user_id,
         "raw_input": "input",
         "status": "completed",
         "detected_language": "en",
         "started_at": "2023-01-01T00:00:00"
-    }
-    mock_supabase.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_response
+    }]
+    mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = mock_response
     
     response = client.get(f"/api/v1/requests/{session_id}")
     assert response.status_code == 200
@@ -49,8 +68,8 @@ def test_get_request_status(mock_supabase):
 def test_get_request_status_not_found():
     with patch("app.api.routes.requests.supabase") as mock_supabase:
         mock_response = MagicMock()
-        mock_response.data = None
-        mock_supabase.table.return_value.select.return_value.eq.return_value.single.return_value.execute.return_value = mock_response
+        mock_response.data = []
+        mock_supabase.table.return_value.select.return_value.eq.return_value.execute.return_value = mock_response
         
         response = client.get(f"/api/v1/requests/{uuid.uuid4()}")
         assert response.status_code == 404

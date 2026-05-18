@@ -113,10 +113,83 @@ async def run_workflow(user_input: str, user_id: str, session_id: str) -> dict:
                 run_config=RunConfig(tracing_disabled=True, model_settings=ModelSettings(parallel_tool_calls=False)),
             )
 
+            # Determine final status programmatically based on workflow execution
+            final_status = "completed"
+            if (
+                trace_run_hooks.has_providers_found is False 
+                or (trace_run_hooks.has_providers_found is True and not trace_run_hooks.has_booking_created)
+            ):
+                final_status = "failed"
+
             await asyncio.to_thread(update_session_status, UpdateSessionInput(
                 session_id=session_id,
-                status="completed"
+                status=final_status
             ))
+
+        except (APIStatusError, ValueError) as e:
+            # --- Fallback to Gemini if OpenAI fails OR key is missing ---
+            print(f"DEBUG: OpenAI initialization failed or API error: {e}")
+            print("Falling back to Gemini...")
+            try:
+                def create_fallback_agent(name, instructions):
+                    return Agent(name=name, instructions=instructions, model=get_fallback_model(), hooks=trace_agent_hooks)
+
+                f_discovery = create_fallback_agent("DiscoveryAgent", DISCOVERY_AGENT_PROMPT)
+                f_ranking   = create_fallback_agent("RankingAgent", RANKING_AGENT_PROMPT)
+                f_booking   = create_fallback_agent("BookingAgent", BOOKING_AGENT_PROMPT)
+                f_followup  = create_fallback_agent("FollowupAgent", FOLLOWUP_AGENT_PROMPT)
+
+                fallback_tools = [
+                    f_discovery.as_tool(
+                        tool_name="run_discovery",
+                        tool_description="Find available providers matching service type and area. Pass service_type, area, and slot_date."
+                    ),
+                    f_ranking.as_tool(
+                        tool_name="run_ranking",
+                        tool_description="Rank a list of providers by score. Pass provider list with available_slots_count, user_lat, user_lng."
+                    ),
+                    f_booking.as_tool(
+                        tool_name="run_booking",
+                        tool_description="Create a booking for a provider slot. Pass user_id, provider_id, and slot_id."
+                    ),
+                    f_followup.as_tool(
+                        tool_name="run_followup",
+                        tool_description="Schedule follow-up notifications. Pass booking_id, user_id, slot_date, and slot_time."
+                    ),
+                ]
+
+                orchestrator_fallback = Agent(
+                    name="Orchestrator-Fallback",
+                    instructions=ORCHESTRATOR_PROMPT,
+                    model=get_fallback_model(),
+                    tools=fallback_tools,
+                    hooks=trace_agent_hooks,
+                )
+                result = await Runner.run(
+                    orchestrator_fallback,
+                    input=initial_message,
+                    hooks=trace_run_hooks,
+                    run_config=RunConfig(tracing_disabled=True, model_settings=ModelSettings(parallel_tool_calls=False)),
+                )
+
+                # Determine final status programmatically based on workflow execution
+                final_status = "completed"
+                if (
+                    trace_run_hooks.has_providers_found is False 
+                    or (trace_run_hooks.has_providers_found is True and not trace_run_hooks.has_booking_created)
+                ):
+                    final_status = "failed"
+
+                await asyncio.to_thread(update_session_status, UpdateSessionInput(
+                    session_id=session_id,
+                    status=final_status
+                ))
+            except Exception as inner_e:
+                await asyncio.to_thread(update_session_status, UpdateSessionInput(
+                    session_id=session_id,
+                    status="failed"
+                ))
+                raise inner_e
 
         except Exception as e:
             await asyncio.to_thread(update_session_status, UpdateSessionInput(

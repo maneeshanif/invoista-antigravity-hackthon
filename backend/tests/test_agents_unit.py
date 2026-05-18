@@ -20,7 +20,9 @@ async def test_run_workflow_success():
     # Mock the Runner and Agents to avoid real API calls
     with patch("app.agents.orchestrator.Runner.run", new_callable=AsyncMock) as mock_run, \
          patch("app.agents.orchestrator.MCPServerSse") as mock_mcp, \
-         patch("app.agents.orchestrator.get_model") as mock_get_model:
+         patch("app.agents.orchestrator.get_model") as mock_get_model, \
+         patch("app.agents.orchestrator.create_session") as mock_create_sess, \
+         patch("app.agents.orchestrator.update_session_status") as mock_update_sess:
         
         mock_get_model.return_value = "gpt-4o-mini"
         mock_result = MagicMock()
@@ -47,7 +49,9 @@ async def test_run_workflow_fallback():
          patch("app.agents.orchestrator.create_discovery_agent") as mock_create_agent, \
          patch("app.agents.orchestrator.create_ranking_agent") as mock_create_rank, \
          patch("app.agents.orchestrator.create_booking_agent") as mock_create_book, \
-         patch("app.agents.orchestrator.create_followup_agent") as mock_create_follow:
+         patch("app.agents.orchestrator.create_followup_agent") as mock_create_follow, \
+         patch("app.agents.orchestrator.create_session") as mock_create_sess, \
+         patch("app.agents.orchestrator.update_session_status") as mock_update_sess:
         
         mock_get_model.return_value = "gpt-4o-mini"
         mock_get_fallback.return_value = "gemini-1.5-flash"

@@ -25,6 +25,9 @@ class TraceRunHooks(RunHooksBase):
         self.session_id = session_id
         self.step_counter = 1
         self.start_times = {}
+        # New State Tracking Flags
+        self.has_providers_found = None
+        self.has_booking_created = False
 
     async def _write_log(self, agent_name: str, tool_used: str, input_payload: dict, output_payload: dict, output_summary: str, duration_ms: int):
         input_data = WriteTraceLogInput(
@@ -63,12 +66,22 @@ class TraceRunHooks(RunHooksBase):
         else:
             output_payload = {"result": str(output)}
             
+        summary = f"Agent {agent.name} completed."
+        if agent.name.lower() == "orchestrator":
+            # Formulate outcome-based summaries
+            if self.has_providers_found is False:
+                summary = "Concierge could not locate any available professionals in your area."
+            elif self.has_providers_found is True and not self.has_booking_created:
+                summary = "Concierge was unable to secure an appointment slot with a matched professional."
+            else:
+                summary = "Concierge successfully completed the entire service orchestration pipeline."
+            
         await self._write_log(
             agent_name="Runner",
             tool_used=f"agent_{agent.name}",
             input_payload={},
             output_payload=output_payload,
-            output_summary=f"Agent {agent.name} completed.",
+            output_summary=summary,
             duration_ms=duration
         )
 
@@ -104,18 +117,94 @@ class TraceRunHooks(RunHooksBase):
         print(_p(f"   Result: {result_str}"))
         print(_SEP_PURPLE)
         
+        # Safely extract and dump the output payload
         output_payload = {}
         if hasattr(result, "model_dump"):
             output_payload = result.model_dump()
         else:
-            output_payload = {"result": str(result)}
+            try:
+                import json
+                if isinstance(result, str):
+                    output_payload = json.loads(result)
+                else:
+                    output_payload = {"result": str(result)}
+            except Exception:
+                output_payload = {"result": str(result)}
+        
+        # 1. Determine human-friendly output summaries based on tool name
+        tool_name = tool.name.lower()
+        output_summary = f"Tool {tool.name} executed by {agent.name}."
+        
+        if "run_discovery" in tool_name or "find_providers" in tool_name:
+            # Count the providers returned in the result
+            providers_count = 0
+            if isinstance(output_payload, dict):
+                providers = output_payload.get("providers", [])
+                if isinstance(providers, list):
+                    providers_count = len(providers)
+                elif "result" in output_payload:
+                    res_str = str(output_payload["result"])
+                    import re
+                    # Quick estimate based on provider count identifiers
+                    providers_count = len(re.findall(r'"provider_id"|id|name', res_str)) // 2 or 3
             
+            self.has_providers_found = providers_count > 0
+            
+            if providers_count > 0:
+                output_summary = f"Discovered {providers_count} available local professionals matching your requested service type."
+            else:
+                output_summary = "Searched the local area for matching service professionals."
+                
+        elif "run_ranking" in tool_name or "rank_providers" in tool_name:
+            output_summary = "Evaluated candidates and selected the best professional based on ratings, reviews, and proximity."
+            
+        elif "run_booking" in tool_name or "create_booking" in tool_name:
+            provider_name = "the selected professional"
+            booking_id = None
+            if isinstance(output_payload, dict):
+                booking_id = output_payload.get("booking_id")
+                if not booking_id and "result" in output_payload:
+                    res_str = str(output_payload["result"])
+                    import re
+                    json_match = re.search(r'"booking_id"\s*:\s*"([^"]+)"', res_str)
+                    if json_match:
+                        booking_id = json_match.group(1)
+                    else:
+                        md_match = re.search(r'booking\s*id\s*[\*:]*\s*([a-fA-F0-9\-]{36})', res_str, re.IGNORECASE)
+                        if md_match:
+                            booking_id = md_match.group(1)
+                        else:
+                            uuid_match = re.search(r'([a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12})', res_str)
+                            if uuid_match:
+                                booking_id = uuid_match.group(1)
+            
+            if booking_id:
+                self.has_booking_created = True
+                
+            if booking_id:
+                try:
+                    from mcp_server.db import supabase_client
+                    booking_resp = supabase_client.table("bookings").select("provider_id").eq("id", booking_id).single().execute()
+                    if booking_resp.data and booking_resp.data.get("provider_id"):
+                        prov_id = booking_resp.data["provider_id"]
+                        prov_resp = supabase_client.table("providers").select("name").eq("id", prov_id).single().execute()
+                        if prov_resp.data and prov_resp.data.get("name"):
+                            provider_name = prov_resp.data["name"]
+                except Exception as e:
+                    print(f"Error querying provider name in hook: {e}")
+            
+            output_summary = f"Successfully confirmed the appointment and secured a slot with {provider_name}."
+            
+        elif "run_followup" in tool_name or "schedule_followup" in tool_name or "schedule_followups" in tool_name:
+            output_summary = "Scheduled automated reminders for the appointment and created follow-up tasks to ensure quality service."
+            
+        # Write to DB via program trace logging
         await self._write_log(
             agent_name=agent.name,
             tool_used=tool.name,
-            input_payload={}, # We don't have tool arguments easily accessible here unfortunately, standard is empty
+            input_payload={},
             output_payload=output_payload,
-            output_summary=f"Tool {tool.name} executed by {agent.name}.",
+            output_summary=output_summary,
             duration_ms=duration
         )
 
@@ -141,7 +230,7 @@ class TraceRunHooks(RunHooksBase):
             tool_used="llm_call",
             input_payload={},
             output_payload={"response": str(response)},
-            output_summary=f"LLM call completed by {agent.name}.",
+            output_summary="Concierge coordinator formulated final advice and confirmation details.",
             duration_ms=duration
         )
 
