@@ -21,6 +21,7 @@
 - [x] 02-auth.md
 - [x] 03-homepage.md
 - [x] 05-wiring-backend-with-frontend.md
+- [x] 06-notifications-and-polling.md
 
 ## Integration Wiring — Completed (05-wiring-backend-with-frontend.md)
 

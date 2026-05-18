@@ -7,6 +7,8 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
+import Toast from 'react-native-toast-message';
+import { useNotificationsPolling } from '@/hooks/useNotificationsPolling';
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
@@ -28,6 +30,8 @@ function InitialLayout() {
   const { isLoaded, isSignedIn } = useAuth();
   const segments = useSegments();
   const router = useRouter();
+
+  useNotificationsPolling();
 
   useEffect(() => {
     console.log('Auth State:', { isLoaded, isSignedIn, segments });
@@ -94,6 +98,7 @@ export default function RootLayout() {
       <ThemeProvider value={colorScheme === 'dark' ? customDarkTheme : DefaultTheme}>
         <InitialLayout />
         <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+        <Toast />
       </ThemeProvider>
     </ClerkProvider>
   );

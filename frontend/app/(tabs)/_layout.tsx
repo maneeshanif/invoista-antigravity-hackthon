@@ -1,11 +1,14 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
-import { Home, Compass } from 'lucide-react-native';
+import { Home, Compass, Bell } from 'lucide-react-native';
 import { HapticTab } from '@/components/haptic-tab';
 import { Typography } from '@/constants/theme';
+import { useNotificationStore } from '@/store/useNotificationStore';
 
 export default function TabLayout() {
+  const { unreadCount } = useNotificationStore();
+  
   return (
     <Tabs
       screenOptions={{
@@ -46,6 +49,19 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View style={focused ? styles.activeIcon : null}>
               <Compass size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'ALERTS',
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: { backgroundColor: '#FF3366', color: '#fff', fontSize: 10 },
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? styles.activeIcon : null}>
+              <Bell size={22} color={color} />
             </View>
           ),
         }}

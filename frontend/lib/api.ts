@@ -83,6 +83,17 @@ export interface User {
   lng: number;
 }
 
+export interface Notification {
+  id: string;
+  booking_id: string;
+  user_id: string;
+  type: string;
+  message: string;
+  scheduled_at: string;
+  sent_at: string | null;
+  status: string;
+}
+
 export interface FollowupTrigger {
   booking_id: string;
 }
@@ -155,6 +166,15 @@ export const api = {
   // Me
   getMyProfile: (token?: string | null) =>
     request<User>('/me/', {}, token),
+
+  getMyBookings: (token?: string | null) =>
+    request<Booking[]>('/me/bookings', {}, token),
+
+  getMyNotifications: (token?: string | null) =>
+    request<Notification[]>('/me/notifications', {}, token),
+
+  readNotification: (id: string, token?: string | null) =>
+    request<{ message: string }>(`/me/notifications/${id}/read`, { method: 'POST' }, token),
 
   // Followups
   triggerFollowup: (body: FollowupTrigger, token?: string | null) =>
