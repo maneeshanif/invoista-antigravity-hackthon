@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
 import { useNotificationStore } from '@/store/useNotificationStore';
 import { api } from '@/lib/api';
 import { useAuth } from '@clerk/expo';
@@ -8,9 +8,31 @@ import { Bell, CheckCircle2, MessageSquare } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 export default function NotificationsScreen() {
-  const { notifications, markAsRead } = useNotificationStore();
+  const { notifications, markAsRead, setNotifications } = useNotificationStore();
   const { getToken } = useAuth();
   const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchLatest = useCallback(async () => {
+    try {
+      const token = await getToken();
+      if (!token) return;
+      const data = await api.getMyNotifications(token);
+      setNotifications(data);
+    } catch (e) {
+      console.error('Failed to fetch notifications on demand:', e);
+    }
+  }, [getToken, setNotifications]);
+
+  useEffect(() => {
+    fetchLatest();
+  }, [fetchLatest]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchLatest();
+    setRefreshing(false);
+  };
 
   const handleRead = async (id: string, isRead: boolean) => {
     if (isRead) return;
@@ -68,19 +90,26 @@ export default function NotificationsScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.header}>Notifications</Text>
-      {notifications.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <CheckCircle2 size={48} color="rgba(255,255,255,0.2)" />
-          <Text style={styles.emptyText}>You're all caught up!</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={notifications}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-        />
-      )}
+      <FlatList
+        data={notifications}
+        keyExtractor={(item) => item.id}
+        renderItem={renderItem}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <CheckCircle2 size={48} color="rgba(255,255,255,0.2)" />
+            <Text style={styles.emptyText}>You're all caught up!</Text>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#00F3FF"
+            colors={["#00F3FF"]}
+          />
+        }
+      />
     </View>
   );
 }
@@ -101,6 +130,7 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
+    flexGrow: 1,
   },
   notificationCard: {
     flexDirection: 'row',
@@ -143,14 +173,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#00F3FF',
   },
   messageText: {
-    fontFamily: Typography.fonts.regular,
+    fontFamily: Typography.fonts.primary,
     fontSize: 16,
     color: Colors.dark.text,
     marginBottom: 8,
     lineHeight: 22,
   },
   dateText: {
-    fontFamily: Typography.fonts.regular,
+    fontFamily: Typography.fonts.primary,
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.5)',
   },

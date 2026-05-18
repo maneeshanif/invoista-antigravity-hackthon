@@ -63,7 +63,9 @@ function InitialLayout() {
   );
 }
 
-export default function RootLayout() {
+import { AppThemeProvider } from '@/context/ThemeContext';
+
+function RootLayoutInner() {
   const colorScheme = useColorScheme();
   const [loaded] = useFonts({
     Outfit_400Regular,
@@ -94,12 +96,20 @@ export default function RootLayout() {
   };
 
   return (
+    <ThemeProvider value={colorScheme === 'dark' ? customDarkTheme : DefaultTheme}>
+      <InitialLayout />
+      <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+      <Toast />
+    </ThemeProvider>
+  );
+}
+
+export default function RootLayout() {
+  return (
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
-      <ThemeProvider value={colorScheme === 'dark' ? customDarkTheme : DefaultTheme}>
-        <InitialLayout />
-        <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-        <Toast />
-      </ThemeProvider>
+      <AppThemeProvider>
+        <RootLayoutInner />
+      </AppThemeProvider>
     </ClerkProvider>
   );
 }

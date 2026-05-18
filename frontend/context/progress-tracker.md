@@ -22,6 +22,8 @@
 - [x] 03-homepage.md
 - [x] 05-wiring-backend-with-frontend.md
 - [x] 06-notifications-and-polling.md
+- [x] 07-bookingtab-and-request-refactor.md
+- [x] 08-landing-page-cleanup.md
 
 ## Integration Wiring — Completed (05-wiring-backend-with-frontend.md)
 
@@ -65,4 +67,17 @@
 - [ ] Finalizing the exact prompt templates for the agents.
 - [ ] Backend `me.py` uses hardcoded `user_id` — Clerk JWT not yet verified server-side (acceptable for hackathon).
 - [ ] Device LAN testing: update `EXPO_PUBLIC_API_BASE_URL` to machine LAN IP when testing on physical device.
-- [ ] `AIInput` component may need a `disabled` prop added if not already supported.
+- [x] `AIInput` component may need a `disabled` prop added if not already supported.
+
+## Landing Page Cleanup & Inline AI Logs — Completed (08-landing-page-cleanup.md)
+
+### P0 — Critical (All Done ✅)
+- [x] Remove legacy components (ServiceCard, ActiveBookingCard, Chips, Quick Actions) from `app/(tabs)/index.tsx`
+- [x] Remove local providers & categories fetching logic from home screen
+- [x] Refactor `AIInput` submission to trigger inline session state instead of routing to `/request/[id]`
+- [x] Add local polling state (`activeSessionId`, `sessionStatus`, `traces`) to the home screen
+- [x] Build beautiful, dynamic container below `AIInput` to render traces inline
+
+### P1 — High Priority (All Done ✅)
+- [x] Integrate dynamic booking results card and link to receipt screen `/booking/[id]` on successful completion
+- [x] Optimize responsive styling and test layout fluidity across device sizes

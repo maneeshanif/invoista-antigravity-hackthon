@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import React from 'react';
 import { Platform, View, StyleSheet } from 'react-native';
-import { Home, Compass, Bell } from 'lucide-react-native';
+import { Home, Compass, Calendar, Bell } from 'lucide-react-native';
 import { HapticTab } from '@/components/haptic-tab';
 import { Typography } from '@/constants/theme';
 import { useNotificationStore } from '@/store/useNotificationStore';
@@ -49,6 +49,17 @@ export default function TabLayout() {
           tabBarIcon: ({ color, focused }) => (
             <View style={focused ? styles.activeIcon : null}>
               <Compass size={22} color={color} />
+            </View>
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="bookings"
+        options={{
+          title: 'BOOKINGS',
+          tabBarIcon: ({ color, focused }) => (
+            <View style={focused ? styles.activeIcon : null}>
+              <Calendar size={22} color={color} />
             </View>
           ),
         }}

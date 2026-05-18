@@ -5,27 +5,92 @@ import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GlassCard } from '@/components/shared/GlassCard';
-import { Sparkles, CheckCircle2, Brain, Search, ShieldCheck, MapPin, AlertCircle, RefreshCw } from 'lucide-react-native';
+import { Sparkles, CheckCircle2, Brain, Search, ShieldCheck, MapPin, AlertCircle, RefreshCw, Bell } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/useApi';
-import type { Session, TraceLog } from '@/lib/api';
+import type { Session, TraceLog, Provider } from '@/lib/api';
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 120_000;
 
 // Icon mapping for agent names
 function agentIcon(agentName: string, toolUsed: string | null) {
-  if (agentName.toLowerCase().includes('intent')) return <Brain size={20} color={Colors.dark.accent} />;
-  if (agentName.toLowerCase().includes('discover') || toolUsed?.includes('find')) return <Search size={20} color="#A78BFA" />;
-  if (agentName.toLowerCase().includes('rank') || agentName.toLowerCase().includes('match')) return <ShieldCheck size={20} color="#10B981" />;
-  if (agentName.toLowerCase().includes('book')) return <MapPin size={20} color="#F59E0B" />;
+  const agent = agentName.toLowerCase();
+  const tool = toolUsed?.toLowerCase() || '';
+  
+  if (agent.includes('intent')) return <Brain size={20} color={Colors.dark.accent} />;
+  if (agent.includes('discover') || tool.includes('discovery') || tool.includes('find')) {
+    return <Search size={20} color="#A78BFA" />;
+  }
+  if (agent.includes('rank') || agent.includes('match') || tool.includes('ranking') || tool.includes('match')) {
+    return <ShieldCheck size={20} color="#10B981" />;
+  }
+  if (agent.includes('book') || tool.includes('booking')) {
+    return <MapPin size={20} color="#F59E0B" />;
+  }
+  if (agent.includes('followup') || tool.includes('followup') || tool.includes('notification') || tool.includes('reminder')) {
+    return <Bell size={20} color="#3B82F6" />;
+  }
   return <Sparkles size={20} color={Colors.dark.accent} />;
 }
+
+const getFriendlyAgentName = (rawName: string) => {
+  const map: Record<string, string> = {
+    Orchestrator: 'Main AI Coordinator',
+    DiscoveryAgent: 'Discovery Specialist',
+    RankingAgent: 'Matching Specialist',
+    BookingAgent: 'Booking Coordinator',
+  };
+  return map[rawName] || rawName;
+};
+
+const getFriendlyAgentNameForTrace = (trace: TraceLog) => {
+  const tool = trace.tool_used?.toLowerCase() || '';
+  if (tool.includes('discovery') || tool.includes('find_providers')) {
+    return 'Discovery Specialist';
+  }
+  if (tool.includes('ranking') || tool.includes('rank_providers')) {
+    return 'Matching Specialist';
+  }
+  if (tool.includes('booking') || tool.includes('create_booking')) {
+    return 'Booking Coordinator';
+  }
+  if (tool.includes('followup') || tool.includes('schedule_followup')) {
+    return 'Notification Coordinator';
+  }
+  return getFriendlyAgentName(trace.agent_name);
+};
+
+const getFriendlyToolName = (toolName: string | null) => {
+  if (!toolName) return 'Finalizing response...';
+  const name = toolName.toLowerCase();
+  
+  if (name.includes('run_discovery') || name.includes('find_providers')) {
+    return 'Searching for qualified professionals in your area...';
+  }
+  if (name.includes('run_ranking') || name.includes('rank_providers')) {
+    return 'Evaluating and matching the best professionals for you...';
+  }
+  if (name.includes('run_booking') || name.includes('create_booking')) {
+    return 'Securing your booking slot...';
+  }
+  if (name.includes('run_followup') || name.includes('schedule_followup')) {
+    return 'Setting up follow-up reminders and quality check...';
+  }
+  if (name.includes('call_agent')) {
+    return 'Consulting with sub-specialist...';
+  }
+  if (name.includes('llm_call')) {
+    return 'Formulating final advice and booking details...';
+  }
+  
+  return `Coordinating step: ${toolName}`;
+};
 
 export default function RequestStatusScreen() {
   const { id: sessionId, query } = useLocalSearchParams<{ id: string; query: string }>();
   const router = useRouter();
-  const { getSession, getSessionTrace } = useApi();
+  const { getSession, getSessionTrace, exportSessionTrace, getProvider } = useApi();
 
   const [sessionStatus, setSessionStatus] = useState<Session['status']>('pending');
   const [traces, setTraces] = useState<TraceLog[]>([]);
@@ -77,16 +142,41 @@ export default function RequestStatusScreen() {
     return () => { cancelled = true; };
   }, [sessionId]);
 
-  // Navigate to provider selection when completed
+  const [bookingData, setBookingData] = useState<{ provider: Provider, bookingId: string } | null>(null);
+
+  // Fetch the booking details when completed
   useEffect(() => {
     if (sessionStatus === 'completed') {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace({
-        pathname: '/provider/[sessionId]',
-        params: { sessionId }
-      });
+      
+      const fetchBooking = async () => {
+        try {
+          const { traces } = await exportSessionTrace(sessionId) as any;
+          const bookingTrace = traces.find((t: any) => t.tool_used === 'create_booking');
+          if (bookingTrace?.output_payload) {
+             const { booking_id, provider_id } = bookingTrace.output_payload as any;
+             const provider = await getProvider(provider_id);
+             setBookingData({ provider, bookingId: booking_id });
+          }
+        } catch (err) {
+          console.error("Failed to load booking info:", err);
+        }
+      };
+      fetchBooking();
     }
   }, [sessionStatus]);
+
+  const getFailureReason = () => {
+    if (error) return error;
+    if (timedOut) return 'The AI took too long. Please try again.';
+    
+    // Look for the final runner agent trace for Orchestrator
+    const finalOrchTrace = traces.find(t => t.agent_name === 'Runner' && t.tool_used?.toLowerCase() === 'agent_orchestrator');
+    if (finalOrchTrace?.output_summary) {
+      return finalOrchTrace.output_summary;
+    }
+    return 'The AI could not process your request. Please try a different service or area.';
+  };
 
   const isRunning = sessionStatus === 'pending' || sessionStatus === 'running';
   const isFailed = sessionStatus === 'failed' || timedOut || !!error;
@@ -123,10 +213,7 @@ export default function RequestStatusScreen() {
           <GlassCard style={styles.errorCard}>
             <AlertCircle size={20} color="#FF4B4B" />
             <ThemedText style={styles.errorText}>
-              {error ?? (timedOut
-                ? 'The AI took too long. Please try again.'
-                : 'The AI could not process your request.'
-              )}
+              {getFailureReason()}
             </ThemedText>
             <TouchableOpacity
               style={styles.retryButton}
@@ -170,18 +257,20 @@ export default function RequestStatusScreen() {
                   </View>
 
                   <View style={styles.iconContainer}>
-                    <CheckCircle2 size={24} color="#10B981" />
+                    {agentIcon(trace.agent_name, trace.tool_used)}
                   </View>
 
                   <View style={styles.textContainer}>
                     <ThemedText style={[styles.stepLabel, styles.completeText]}>
-                      {trace.agent_name}
+                      {getFriendlyAgentNameForTrace(trace)}
                     </ThemedText>
-                    {trace.tool_used && (
-                      <ThemedText style={styles.toolText}>🔧 {trace.tool_used}</ThemedText>
-                    )}
+                    <ThemedText style={styles.toolText}>🔧 {getFriendlyToolName(trace.tool_used)}</ThemedText>
                     {trace.output_summary && (
-                      <ThemedText style={styles.summaryText}>{trace.output_summary}</ThemedText>
+                      <View style={!trace.tool_used ? styles.highlightSummary : undefined}>
+                        <ThemedText style={!trace.tool_used ? styles.summaryTextHighlight : styles.summaryText}>
+                          {trace.output_summary}
+                        </ThemedText>
+                      </View>
                     )}
                     {trace.duration_ms != null && (
                       <View style={styles.durationChip}>
@@ -208,6 +297,23 @@ export default function RequestStatusScreen() {
             </View>
           )}
         </GlassCard>
+
+        {sessionStatus === 'completed' && bookingData && (
+          <View style={styles.bookingResultContainer}>
+            <ThemedText style={styles.traceHeader}>Successfully Booked!</ThemedText>
+            <GlassCard style={styles.providerCard}>
+              <ThemedText style={styles.providerName}>{bookingData.provider.name}</ThemedText>
+              <ThemedText style={styles.providerCategory}>{bookingData.provider.category}</ThemedText>
+              
+              <TouchableOpacity 
+                 style={styles.viewBookingBtn}
+                 onPress={() => router.push(`/booking/${bookingData.bookingId}`)}
+              >
+                <ThemedText style={styles.btnText}>View Booking Receipt</ThemedText>
+              </TouchableOpacity>
+            </GlassCard>
+          </View>
+        )}
       </ScrollView>
     </ThemedView>
   );
@@ -383,5 +489,56 @@ const styles = StyleSheet.create({
     width: '60%',
     backgroundColor: Colors.dark.accent,
     borderRadius: 2,
+  },
+  highlightSummary: {
+    marginTop: Spacing.sm,
+    padding: Spacing.sm,
+    backgroundColor: 'rgba(0, 243, 255, 0.1)',
+    borderRadius: Radius.md,
+    borderLeftWidth: 3,
+    borderLeftColor: Colors.dark.accent,
+  },
+  summaryTextHighlight: {
+    fontSize: 14,
+    color: '#FFF',
+    fontFamily: Typography.fonts.medium,
+    lineHeight: 20,
+  },
+  bookingResultContainer: {
+    marginTop: Spacing.xl,
+    paddingTop: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
+  },
+  providerCard: {
+    padding: Spacing.lg,
+    borderRadius: Radius.xl,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+  },
+  providerName: {
+    fontSize: Typography.sizes.lg,
+    fontFamily: Typography.fonts.bold,
+    color: '#FFF',
+    marginBottom: 4,
+  },
+  providerCategory: {
+    fontSize: Typography.sizes.sm,
+    fontFamily: Typography.fonts.medium,
+    color: 'rgba(255,255,255,0.6)',
+    marginBottom: Spacing.lg,
+  },
+  viewBookingBtn: {
+    backgroundColor: Colors.dark.accent,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.xl,
+    borderRadius: Radius.full,
+    width: '100%',
+    alignItems: 'center',
+  },
+  btnText: {
+    color: '#000',
+    fontFamily: Typography.fonts.bold,
+    fontSize: Typography.sizes.md,
   },
 });

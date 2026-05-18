@@ -53,14 +53,15 @@ export const AIInput = ({ onSend, loading, disabled }: AIInputProps) => {
         <View style={styles.inner}>
           <Sparkles size={20} color={Colors.dark.accent} style={styles.icon} />
           <TextInput
-            style={styles.input}
-            placeholder="Describe what you need help with..."
-            placeholderTextColor="rgba(255,255,255,0.4)"
+            style={[styles.input, disabled && styles.disabledInput]}
+            placeholder={disabled ? "AI is coordinating service..." : "Describe what you need help with..."}
+            placeholderTextColor={disabled ? "rgba(0, 243, 255, 0.6)" : "rgba(255,255,255,0.4)"}
             value={text}
             onChangeText={setText}
             multiline
             maxLength={200}
             selectionColor={Colors.dark.accent}
+            editable={!disabled}
           />
           <TouchableOpacity 
             style={[styles.sendButton, (!text.trim() || disabled) && styles.disabled]} 
@@ -71,7 +72,9 @@ export const AIInput = ({ onSend, loading, disabled }: AIInputProps) => {
           </TouchableOpacity>
         </View>
       </GlassCard>
-      <ThemedText style={styles.hint}>AI Agent will process your request instantly</ThemedText>
+      <ThemedText style={styles.hint}>
+        {disabled ? "AI Concierge is processing your request..." : "AI Agent will process your request instantly"}
+      </ThemedText>
     </View>
   );
 };
@@ -113,6 +116,10 @@ const styles = StyleSheet.create({
     minHeight: 45,
     paddingVertical: Spacing.sm,
     backgroundColor: 'transparent',
+  },
+  disabledInput: {
+    color: '#00F3FF',
+    opacity: 0.8,
   },
   sendButton: {
     width: 40,
