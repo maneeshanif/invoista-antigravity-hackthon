@@ -10,7 +10,7 @@ Architecture:
   - LLM Fallback: If OpenAI fails, the Orchestrator retries with Gemini.
 """
 
-from agents import Agent, Runner, RunConfig, enable_verbose_stdout_logging
+from agents import Agent, Runner, RunConfig, enable_verbose_stdout_logging, ModelSettings
 from agents.mcp import MCPServerSse
 import asyncio
 from datetime import date
@@ -110,7 +110,7 @@ async def run_workflow(user_input: str, user_id: str, session_id: str) -> dict:
                 orchestrator,
                 input=initial_message,
                 hooks=trace_run_hooks,
-                run_config=RunConfig(tracing_disabled=True),
+                run_config=RunConfig(tracing_disabled=True, model_settings=ModelSettings(parallel_tool_calls=False)),
             )
 
             await asyncio.to_thread(update_session_status, UpdateSessionInput(

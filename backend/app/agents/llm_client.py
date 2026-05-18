@@ -60,21 +60,28 @@ def _build_hf_model() -> OpenAIChatCompletionsModel:
 
 def get_model() -> OpenAIChatCompletionsModel:
     """
-    Return the primary HF model.
+    Return the primary model. Uses OpenAI if available, falls back to Hugging Face.
     """
-    # return _build_openai_model()
-    return _build_hf_model()
+    try:
+        return _build_openai_model()
+    except Exception as e:
+        print(f"LLM Client: Failed to build OpenAI model ({e}). Falling back to HF.")
+        return _build_hf_model()
 
 
 def get_fallback_model() -> OpenAIChatCompletionsModel:
     """
-    Return the HF model.
+    Return the fallback model. Uses Gemini if available, falls back to HF.
     """
-    # return _build_gemini_model()
-    return _build_hf_model()
+    try:
+        return _build_gemini_model()
+    except Exception as e:
+        print(f"LLM Client: Failed to build Gemini model ({e}). Falling back to HF.")
+        return _build_hf_model()
 
 def get_secondary_fallback_model() -> OpenAIChatCompletionsModel:
     """
-    Return the HF Kimi fallback model.
+    Return the Hugging Face fallback model.
     """
     return _build_hf_model()
+

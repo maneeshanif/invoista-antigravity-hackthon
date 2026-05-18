@@ -21,7 +21,9 @@ async def create_request(req: RequestCreate, background_tasks: BackgroundTasks):
     """
     Handle incoming user requests and start the agent workflow.
     """
-    user_id = req.user_id or "11111111-1111-1111-1111-111111111111"
+    # For demo purposes, we enforce the hardcoded user UUID since Clerk IDs are not UUIDs
+    # and the DB schema uses UUIDs for user_id.
+    user_id = "11111111-1111-1111-1111-111111111111"
     session_id = str(uuid.uuid4())
     
     # Start the orchestrator in the background
@@ -34,7 +36,7 @@ async def get_request_status(session_id: str):
     """
     Get the status of a specific session.
     """
-    response = supabase.table("sessions").select("*").eq("id", session_id).single().execute()
+    response = supabase.table("sessions").select("*").eq("id", session_id).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="Session not found")
-    return response.data
+    return response.data[0]

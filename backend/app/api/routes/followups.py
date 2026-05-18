@@ -12,11 +12,11 @@ async def trigger_followup(trigger: FollowupTrigger):
     Manually trigger a follow-up for demo purposes.
     """
     # Fetch the booking to get user details
-    booking_res = supabase.table("bookings").select("*").eq("id", str(trigger.booking_id)).single().execute()
+    booking_res = supabase.table("bookings").select("*").eq("id", str(trigger.booking_id)).execute()
     if not booking_res.data:
         raise HTTPException(status_code=404, detail="Booking not found")
-    
-    booking = booking_res.data
+
+    booking = booking_res.data[0]
     
     # Create a notification record
     notification_data = {

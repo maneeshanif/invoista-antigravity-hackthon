@@ -24,7 +24,7 @@ async def get_provider(id: str):
     """
     Get details for a specific provider.
     """
-    response = supabase.table("providers").select("*").eq("id", id).single().execute()
+    response = supabase.table("providers").select("*").eq("id", id).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="Provider not found")
-    return response.data
+    return response.data[0]

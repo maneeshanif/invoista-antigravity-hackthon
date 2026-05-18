@@ -12,8 +12,8 @@ async def get_my_profile():
     # For demo, using hardcoded user ID
     user_id = "11111111-1111-1111-1111-111111111111"
     
-    response = supabase.table("users").select("*").eq("id", user_id).single().execute()
+    response = supabase.table("users").select("*").eq("id", user_id).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    return response.data
+
+    return response.data[0]
