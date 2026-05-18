@@ -28,8 +28,12 @@ Update this file whenever the current phase, active feature, or implementation s
 - Implement `Feature 07 - Test Suite` (Comprehensive tests for API endpoints, AI agents, and MCP server tools using pytest).
 - `context/feature-specs/08-hooks-implementation.md` (Hooks Implementation Spec)
 - Implement `Feature 08 - Hooks Implementation` (TraceRunHooks and TraceAgentHooks implemented).
+- `context/feature-specs/09-clerk-authentication-sync.md` (Clerk Authentication Sync Spec)
 
 ## In Progress
+
+- Implement `Feature 09 - Clerk Authentication Sync` (JIT User Provisioning & JWT Validation)
+- Connect backend API with frontend.
 
 - Connect backend API with frontend.
 

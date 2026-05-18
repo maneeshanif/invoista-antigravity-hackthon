@@ -1,57 +1,48 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 from app.db.schemas import User, Booking, Notification
 from app.db.supabase import supabase
+from app.api.dependencies import get_current_user
 
 router = APIRouter()
 
 @router.get("/", response_model=User)
-async def get_my_profile():
+async def get_my_profile(current_user: User = Depends(get_current_user)):
     """
     Get current user profile data.
     """
-    # For demo, using hardcoded user ID
-    user_id = "11111111-1111-1111-1111-111111111111"
-    
-    response = supabase.table("users").select("*").eq("id", user_id).execute()
+    # Get current user profile data
+    response = supabase.table("users").select("*").eq("id", str(current_user.id)).execute()
     if not response.data:
         raise HTTPException(status_code=404, detail="User not found")
 
     return response.data[0]
 
 @router.get("/bookings", response_model=List[Booking])
-async def get_my_bookings():
+async def get_my_bookings(current_user: User = Depends(get_current_user)):
     """
     Get all bookings associated with the current user.
     """
-    # For demo, using hardcoded user ID
-    user_id = "11111111-1111-1111-1111-111111111111"
-    
-    response = supabase.table("bookings").select("*").eq("user_id", user_id).execute()
+    # Get all bookings associated with the current user.
+    response = supabase.table("bookings").select("*").eq("user_id", str(current_user.id)).execute()
     return response.data
 
 @router.get("/notifications", response_model=List[Notification])
-async def get_my_notifications():
+async def get_my_notifications(current_user: User = Depends(get_current_user)):
     """
     Get all notifications for the current user.
     """
-    # For demo, using hardcoded user ID
-    user_id = "11111111-1111-1111-1111-111111111111"
-    
     # Assuming scheduled_at or sent_at, schema has scheduled_at
-    response = supabase.table("notifications").select("*").eq("user_id", user_id).order("scheduled_at", desc=True).execute()
+    response = supabase.table("notifications").select("*").eq("user_id", str(current_user.id)).order("scheduled_at", desc=True).execute()
     return response.data
 
 @router.post("/notifications/{notification_id}/read")
-async def read_notification(notification_id: str):
+async def read_notification(notification_id: str, current_user: User = Depends(get_current_user)):
     """
     Update the status of a specific notification to 'read'.
     """
-    # For demo, using hardcoded user ID
-    user_id = "11111111-1111-1111-1111-111111111111"
-    
     # Validate it belongs to user
-    check = supabase.table("notifications").select("id").eq("id", notification_id).eq("user_id", user_id).execute()
+    check = supabase.table("notifications").select("id").eq("id", notification_id).eq("user_id", str(current_user.id)).execute()
     if not check.data:
         raise HTTPException(status_code=404, detail="Notification not found")
         

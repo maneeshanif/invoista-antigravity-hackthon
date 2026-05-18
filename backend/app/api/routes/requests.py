@@ -2,9 +2,11 @@ from fastapi import APIRouter, HTTPException, BackgroundTasks
 from typing import Optional
 import uuid
 
-from app.db.schemas import RequestCreate, RequestResponse, Session
+from app.db.schemas import RequestCreate, RequestResponse, Session, User
 from app.db.supabase import supabase
 from app.agents.orchestrator import run_workflow
+from fastapi import Depends
+from app.api.dependencies import get_current_user
 
 router = APIRouter()
 
@@ -17,13 +19,11 @@ async def run_orchestrator_task(user_input: str, user_id: str, session_id: str):
         traceback.print_exc()
 
 @router.post("/", response_model=RequestResponse)
-async def create_request(req: RequestCreate, background_tasks: BackgroundTasks):
+async def create_request(req: RequestCreate, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """
     Handle incoming user requests and start the agent workflow.
     """
-    # For demo purposes, we enforce the hardcoded user UUID since Clerk IDs are not UUIDs
-    # and the DB schema uses UUIDs for user_id.
-    user_id = "11111111-1111-1111-1111-111111111111"
+    user_id = str(current_user.id)
     session_id = str(uuid.uuid4())
     
     # Start the orchestrator in the background

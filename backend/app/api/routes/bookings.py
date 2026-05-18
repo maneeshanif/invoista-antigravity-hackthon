@@ -1,5 +1,6 @@
-from fastapi import APIRouter, HTTPException
-from app.db.schemas import Booking, BookingCreate
+from fastapi import APIRouter, HTTPException, Depends
+from app.db.schemas import Booking, BookingCreate, User
+from app.api.dependencies import get_current_user
 from app.db.supabase import supabase
 import uuid
 from datetime import datetime, timezone
@@ -7,12 +8,11 @@ from datetime import datetime, timezone
 router = APIRouter()
 
 @router.post("/", response_model=Booking)
-async def create_booking(booking_in: BookingCreate):
+async def create_booking(booking_in: BookingCreate, current_user: User = Depends(get_current_user)):
     """
     Manually create a booking.
     """
-    # In a real app, user_id would come from auth
-    user_id = "11111111-1111-1111-1111-111111111111"
+    user_id = str(current_user.id)
     
     booking_data = {
         "id": str(uuid.uuid4()),
