@@ -30,10 +30,10 @@ def test_health_check():
     assert response.json() == {"status": "ok", "version": "0.1.0"}
 
 def test_create_request():
-    # Mock run_workflow and create_session to avoid real LLM/MCP/DB calls
-    with patch("app.api.routes.requests.run_workflow") as mock_run_workflow, \
+    # Mock start_workflow and create_session to avoid real LLM/MCP/DB calls
+    with patch("app.api.routes.requests.start_workflow") as mock_start_workflow, \
          patch("app.api.routes.requests.create_session") as mock_create_session:
-        mock_run_workflow.return_value = {"status": "completed", "session_id": "test-uuid", "summary": "done"}
+        mock_start_workflow.return_value = {"status": "completed", "session_id": "test-uuid", "summary": "done"}
         
         response = client.post(
             "/api/v1/requests/",

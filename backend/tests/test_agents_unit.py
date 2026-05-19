@@ -27,6 +27,7 @@ async def test_run_workflow_success():
         mock_get_model.return_value = "gpt-4o-mini"
         mock_result = MagicMock()
         mock_result.final_output = "Booking confirmed for AC technician."
+        mock_result.interruptions = []
         mock_run.return_value = mock_result
         
         # Mock settings
@@ -35,7 +36,7 @@ async def test_run_workflow_success():
             
             result = await run_workflow("Mujhe AC technician chahiye", "user-123", "sess-123")
             
-            assert result["status"] == "success"
+            assert result["status"] == "completed"
             assert "Booking confirmed" in result["summary"]
             assert mock_run.called
 
@@ -63,10 +64,13 @@ async def test_run_workflow_fallback():
         mock_create_follow.return_value = MagicMock()
         
         from openai import APIStatusError
+        fallback_res = MagicMock()
+        fallback_res.final_output = "Fallback success summary"
+        fallback_res.interruptions = []
         # First call fails, second call succeeds (fallback)
         mock_run.side_effect = [
             APIStatusError("OpenAI down", response=MagicMock(), body={}),
-            MagicMock(final_output="Fallback success summary")
+            fallback_res
         ]
         
         # Mock settings
@@ -75,6 +79,51 @@ async def test_run_workflow_fallback():
             
             result = await run_workflow("Need help", "user-123", "sess-123")
             
-            assert result["status"] == "success"
+            assert result["status"] == "completed"
             assert "Fallback success" in result["summary"]
             assert mock_run.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_resume_workflow_interruption_again():
+    # Test resume_workflow when it pauses again for booking approval
+    from app.agents.orchestrator import resume_workflow
+    
+    with patch("app.agents.orchestrator.Runner.run", new_callable=AsyncMock) as mock_run, \
+         patch("app.agents.orchestrator.MCPServerSse") as mock_mcp, \
+         patch("app.agents.orchestrator.get_model") as mock_get_model, \
+         patch("app.agents.orchestrator.RunState.from_json", new_callable=AsyncMock) as mock_run_state_from_json, \
+         patch("app.agents.orchestrator.update_session_status") as mock_update_sess:
+        
+        mock_get_model.return_value = "gpt-4o-mini"
+        
+        # Mock interruption returned from Runner.run
+        mock_interruption = MagicMock()
+        mock_interruption.arguments = '{"provider_id": "p-123", "slot_id": "s-123", "provider_name": "Test Provider"}'
+        
+        mock_result = MagicMock()
+        mock_result.interruptions = [mock_interruption]
+        mock_state = MagicMock()
+        mock_state.to_json.return_value = {"state": "dummy"}
+        mock_state.get_interruptions.return_value = [mock_interruption]
+        mock_result.to_state.return_value = mock_state
+        mock_run_state_from_json.return_value = mock_state
+        mock_run.return_value = mock_result
+        
+        # Mock settings
+        with patch("app.agents.orchestrator.settings") as mock_settings:
+            mock_settings.MCP_SERVER_URL = "http://localhost:8001/sse"
+            
+            result = await resume_workflow(
+                session_id="sess-123",
+                approved=False,
+                state_payload={"dummy": True},
+                user_id="user-123",
+                rejection_message="Find someone cheaper"
+            )
+            
+            assert result["status"] == "pending_approval"
+            assert result["state_payload"] == {"state": "dummy"}
+            assert result["provider_summary"]["provider_name"] == "Test Provider"
+            assert mock_run.called
+

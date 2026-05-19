@@ -13,14 +13,25 @@ export interface RequestResponse {
   status: 'started';
 }
 
+export interface HITLProviderSummary {
+  provider_id: string;
+  provider_name: string;
+  provider_rating: number;
+  estimated_distance_km: number;
+  slot_id: string;
+  raw_arguments?: Record<string, unknown>;
+}
+
 export interface Session {
   id: string;
   user_id: string;
   raw_input: string;
   detected_language: string | null;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'pending_approval' | 'cancelled';
   started_at: string;
   completed_at: string | null;
+  hitl_status: 'pending_approval' | 'approved' | 'rejected' | null;
+  provider_summary: HITLProviderSummary | null;
 }
 
 export interface Provider {
@@ -143,6 +154,19 @@ export const api = {
 
   exportSessionTrace: (sessionId: string, token?: string | null) =>
     request<{ session_id: string; traces: TraceLog[] }>(`/requests/${sessionId}/trace/export`, {}, token),
+
+  // HITL Booking Approval
+  approveBooking: (sessionId: string, token?: string | null) =>
+    request<{ status: string; message: string }>(`/requests/${sessionId}/approve`, {
+      method: 'POST',
+      body: JSON.stringify({ approved: true }),
+    }, token),
+
+  rejectBooking: (sessionId: string, reason?: string, token?: string | null) =>
+    request<{ status: string; message: string }>(`/requests/${sessionId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason: reason ?? 'The user chose not to proceed with this booking.' }),
+    }, token),
 
   // Providers
   listProviders: (params: { category?: string; area?: string } = {}, token?: string | null) => {

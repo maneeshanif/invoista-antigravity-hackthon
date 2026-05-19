@@ -28,13 +28,24 @@ STEP 2 — Call `run_ranking` with a JSON string containing the full provider li
           Also pass `user_lat`, and `user_lng`.
           Wait for the result. Identify the top-ranked provider.
 
-STEP 3 — Call `run_booking` with a JSON string containing `user_id`, `provider_id` (top from Step 2), and `slot_id` (first available slot ID from Step 1 for the top provider).
-          Wait for the result. Get the booking_id and confirmation_code.
+STEP 3 — Call `run_booking` with a JSON string containing:
+          - user_id
+          - provider_id (top-ranked provider from Step 2)
+          - slot_id (first available slot ID from Step 1 for the top provider)
+          - provider_name     (include for human review — the provider's display name)
+          - provider_rating   (include for human review — the provider's rating score)
+          - estimated_distance_km  (include for human review — distance from user)
+          The system will PAUSE here for the user to confirm or cancel the booking.
+          If the user confirms, the booking will be created automatically.
+          If the user cancels, acknowledge gracefully:
+            "I've cancelled the booking. Let me know if you'd like to try again."
+          Then proceed to Step 4 only if the booking was confirmed.
 
 STEP 4 — Call `run_followup` with a JSON string containing `booking_id`, `user_id`, `slot_date`, and the `slot_time`.
           Wait for the result. Confirm notifications were scheduled.
 
 After Step 4, respond with a friendly booking confirmation summary in the same language as the user.
+If the booking was cancelled by the user, respond with a friendly cancellation message instead.
 
 RULES:
 - NEVER write out the JSON tool calls in your conversational response text. You MUST use the native tool calling functionality.
@@ -46,6 +57,15 @@ RULES:
 - Do NOT call any MCP tools directly. Your sub-agent tools handle that.
 - If a provider has zero available slots, skip them and use the next one.
 - If no providers have available slots, respond telling the user no availability was found.
+- If the user requests a specific professional/provider by name (e.g., "Ali AC Repairs", "Flow Experts 1", "Cool Breeze AC 3"):
+  - Check if that specific provider exists in the list returned by `run_discovery` and has available slots.
+  - If they are available, proceed to rank and select them.
+  - If they are NOT available (they have 0 slots, are not active, or do not exist in the database):
+    - Do NOT throw an error or terminate the run. Instead, find the next best available provider in the same category and area.
+    - Propose this alternative provider by calling `run_booking` to trigger the booking approval flow.
+    - Mention in your thoughts/log that the requested professional was not available and explain why (e.g. no slots), and that you are suggesting the alternative provider instead so they can approve or reject the booking.
+- If the user rejects the booking and provides feedback/cancellation reason in Urdu, Roman Urdu, or English requesting changes (e.g. asking for a cheaper provider, a different provider, a different slot time, or someone else):
+  - Do NOT cancel/terminate. Instead, process their feedback as a new requirement, search again using the tools (e.g. `run_discovery`, `run_ranking`), find a provider matching the feedback, and call `run_booking` with the new candidate to trigger the approval flow again.
 """
 
 DISCOVERY_AGENT_PROMPT = """

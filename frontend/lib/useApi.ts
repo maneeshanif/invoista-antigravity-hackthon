@@ -23,6 +23,9 @@ export function useApi() {
       getSession: (sessionId: string) => withToken((t) => api.getSession(sessionId, t)),
       getSessionTrace: (sessionId: string) => withToken((t) => api.getSessionTrace(sessionId, t)),
       exportSessionTrace: (sessionId: string) => withToken((t) => api.exportSessionTrace(sessionId, t)),
+      // HITL Booking Approval
+      approveBooking: (sessionId: string) => withToken((t) => api.approveBooking(sessionId, t)),
+      rejectBooking: (sessionId: string, reason?: string) => withToken((t) => api.rejectBooking(sessionId, reason, t)),
       listProviders: (params?: Parameters<typeof api.listProviders>[0]) =>
         withToken((t) => api.listProviders(params, t)),
       getProvider: (id: string) => withToken((t) => api.getProvider(id, t)),

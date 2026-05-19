@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, Alert, Modal, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, ScrollView, TouchableOpacity, SafeAreaView, Platform, Dimensions, Alert, Modal, ActivityIndicator, TextInput } from 'react-native';
 import { useUser, useAuth } from '@clerk/expo';
 import { useRouter } from 'expo-router';
 import { 
@@ -14,7 +14,10 @@ import {
   ShieldCheck,
   MapPin,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Star,
+  UserCheck,
+  XCircle
 } from 'lucide-react-native';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
@@ -106,7 +109,7 @@ export default function HomeScreen() {
   const { user } = useUser();
   const { signOut } = useAuth();
   const router = useRouter();
-  const { createRequest, getSession, getSessionTrace, exportSessionTrace, getProvider } = useApi();
+  const { createRequest, getSession, getSessionTrace, exportSessionTrace, getProvider, approveBooking, rejectBooking } = useApi();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
@@ -114,19 +117,25 @@ export default function HomeScreen() {
   // Agent Session State
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessionStatus, setSessionStatus] = useState<Session['status'] | null>(null);
+  const [hitlStatus, setHitlStatus] = useState<Session['hitl_status']>(null);
+  const [providerSummary, setProviderSummary] = useState<Session['provider_summary']>(null);
   const [traces, setTraces] = useState<TraceLog[]>([]);
   const [bookingData, setBookingData] = useState<{ provider: Provider; bookingId: string } | null>(null);
   const [queryText, setQueryText] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [polling, setPolling] = useState(false);
   const [timedOut, setTimedOut] = useState(false);
+  const [deciding, setDeciding] = useState(false);
+  const [feedback, setFeedback] = useState('');
 
   // Polling hook for active session
   useEffect(() => {
     if (!activeSessionId) return;
 
     let cancelled = false;
-    const startTime = Date.now();
+    let activeElapsedMs = 0;
+    let lastTickTime = Date.now();
+    let isHitlPaused = false;
     const POLL_TIMEOUT_MS = 120_000;
 
     const poll = async () => {
@@ -135,7 +144,13 @@ export default function HomeScreen() {
       setTimedOut(false);
       
       while (!cancelled) {
-        if (Date.now() - startTime > POLL_TIMEOUT_MS) {
+        const now = Date.now();
+        if (!isHitlPaused) {
+          activeElapsedMs += now - lastTickTime;
+        }
+        lastTickTime = now;
+
+        if (activeElapsedMs > POLL_TIMEOUT_MS) {
           if (!cancelled) setTimedOut(true);
           break;
         }
@@ -148,10 +163,18 @@ export default function HomeScreen() {
 
           if (!cancelled) {
             setSessionStatus(session.status);
+            setHitlStatus(session.hitl_status);
+            setProviderSummary(session.provider_summary);
             setTraces(traceLogs);
           }
 
-          if (session.status === 'completed' || session.status === 'failed') {
+          // Pause the timeout clock while the user reviews the HITL approval card
+          const isAwaitingDecision =
+            session.status === 'pending_approval' ||
+            session.hitl_status === 'pending_approval';
+          isHitlPaused = isAwaitingDecision;
+
+          if (session.status === 'completed' || session.status === 'failed' || session.status === 'cancelled') {
             break;
           }
         } catch (err: any) {
@@ -230,6 +253,9 @@ export default function HomeScreen() {
     setBookingData(null);
     setTraces([]);
     setSessionStatus('pending');
+    setHitlStatus(null);
+    setProviderSummary(null);
+    setFeedback('');
 
     try {
       const { session_id } = await createRequest({ message: text, user_id: user?.id });
@@ -249,11 +275,49 @@ export default function HomeScreen() {
     }
     setActiveSessionId(null);
     setSessionStatus(null);
+    setHitlStatus(null);
+    setProviderSummary(null);
+    setFeedback('');
     setTraces([]);
     setBookingData(null);
     setQueryText('');
     setError(null);
     setTimedOut(false);
+  };
+
+  const handleApprove = async () => {
+    if (!activeSessionId) return;
+    setDeciding(true);
+    try {
+      await approveBooking(activeSessionId);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+      setHitlStatus('approved');
+      setSessionStatus('running');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to approve booking');
+    } finally {
+      setDeciding(false);
+    }
+  };
+
+  const handleReject = async () => {
+    if (!activeSessionId) return;
+    setDeciding(true);
+    try {
+      await rejectBooking(activeSessionId, feedback.trim() || undefined);
+      if (Platform.OS !== 'web') {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      }
+      setHitlStatus('rejected');
+      setSessionStatus('running');
+      setFeedback('');
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Failed to reject booking');
+    } finally {
+      setDeciding(false);
+    }
   };
 
   const displayName = user?.firstName || user?.emailAddresses?.[0]?.emailAddress?.split('@')[0] || 'Premium';
@@ -270,7 +334,8 @@ export default function HomeScreen() {
     return 'The AI could not process your request. Please try a different service or area.';
   };
 
-  const isRunning = sessionStatus === 'pending' || sessionStatus === 'running';
+  const isPendingApproval = hitlStatus === 'pending_approval' || sessionStatus === 'pending_approval';
+  const isRunning = (sessionStatus === 'pending' || sessionStatus === 'running') && !isPendingApproval;
   const isFailed = sessionStatus === 'failed' || timedOut || !!error;
 
   return (
@@ -330,6 +395,86 @@ export default function HomeScreen() {
                 <Sparkles size={16} color={Colors.dark.accent} />
                 <ThemedText style={styles.queryQuoteText}>"{queryText}"</ThemedText>
               </GlassCard>
+
+              {/* HITL Approval Card */}
+              {isPendingApproval && providerSummary && (
+                <GlassCard style={styles.approvalCard}>
+                  <View style={styles.approvalHeader}>
+                    <UserCheck size={22} color="#10B981" />
+                    <ThemedText style={styles.approvalTitle}>Confirm Your Booking</ThemedText>
+                  </View>
+
+                  <View style={styles.providerInfoRow}>
+                    <View style={styles.providerAvatar}>
+                      <ThemedText style={styles.providerAvatarText}>
+                        {(providerSummary.provider_name || 'P').charAt(0).toUpperCase()}
+                      </ThemedText>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <ThemedText style={styles.approvalProviderName}>
+                        {providerSummary.provider_name || 'Selected Provider'}
+                      </ThemedText>
+                      <View style={styles.providerMeta}>
+                        {providerSummary.provider_rating > 0 && (
+                          <View style={styles.metaChip}>
+                            <Star size={12} color="#F59E0B" />
+                            <ThemedText style={styles.metaText}>{providerSummary.provider_rating}</ThemedText>
+                          </View>
+                        )}
+                        {providerSummary.estimated_distance_km > 0 && (
+                          <View style={styles.metaChip}>
+                            <MapPin size={12} color="#A78BFA" />
+                            <ThemedText style={styles.metaText}>{providerSummary.estimated_distance_km} km</ThemedText>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+
+                  <ThemedText style={styles.approvalQuestion}>
+                    Should we book this provider for you?
+                  </ThemedText>
+
+                  <TextInput
+                    style={styles.feedbackInput}
+                    placeholder="Or tell AI what else you need... (e.g. Find someone cheaper)"
+                    placeholderTextColor="rgba(255,255,255,0.4)"
+                    value={feedback}
+                    onChangeText={setFeedback}
+                    multiline
+                  />
+
+                  <View style={styles.approvalButtons}>
+                    <TouchableOpacity style={styles.cancelBtn} onPress={handleReject} disabled={deciding}>
+                      {deciding ? <ActivityIndicator size="small" color="#FF4B4B" /> : (
+                        <ThemedText style={styles.cancelBtnText}>
+                          {feedback.trim() ? 'Send to AI' : 'Cancel'}
+                        </ThemedText>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.confirmBtn} onPress={handleApprove} disabled={deciding || feedback.trim().length > 0}>
+                      {deciding ? <ActivityIndicator size="small" color="#000" /> : (
+                        <ThemedText style={styles.confirmBtnText}>Confirm Booking</ThemedText>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </GlassCard>
+              )}
+
+              {/* Cancelled State View */}
+              {sessionStatus === 'cancelled' && (
+                <GlassCard style={styles.cancelledCard}>
+                  <XCircle size={24} color="#FF4B4B" style={{ marginBottom: Spacing.sm }} />
+                  <ThemedText style={styles.cancelledTitle}>Booking Cancelled</ThemedText>
+                  <ThemedText style={styles.cancelledText}>
+                    The booking was cancelled at your request. You can start a new concierge request anytime.
+                  </ThemedText>
+                  <TouchableOpacity style={styles.resetButton} onPress={handleResetSession}>
+                    <RefreshCw size={16} color="#000" />
+                    <ThemedText style={styles.resetButtonText}>New Request</ThemedText>
+                  </TouchableOpacity>
+                </GlassCard>
+              )}
 
               {/* Trace Stepper Card */}
               <GlassCard style={styles.traceCard}>
@@ -411,6 +556,29 @@ export default function HomeScreen() {
                       <ThemedText style={styles.stepLabelActive}>Running next agent…</ThemedText>
                       <View style={styles.loadingBar}>
                         <View style={styles.loadingProgress} />
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                {/* Awaiting human approval step in timeline */}
+                {isPendingApproval && (
+                  <View style={styles.stepRow}>
+                    <View style={styles.stepBadgeColumn}>
+                      <View style={styles.stepBadgeContainerActive}>
+                        <Brain size={16} color={Colors.dark.accent} />
+                      </View>
+                    </View>
+                    <View style={styles.textContainer}>
+                      <View style={styles.stepHeaderRow}>
+                        <ThemedText style={styles.stepLabelActive}>Awaiting Approval</ThemedText>
+                        <ThemedText style={styles.stepNumberText}>Step {traces.length + 1}</ThemedText>
+                      </View>
+                      <ThemedText style={styles.toolText}>🔧 run_booking (Human-in-the-Loop)</ThemedText>
+                      <View style={styles.highlightSummary}>
+                        <ThemedText style={styles.summaryTextHighlight}>
+                          Concierge selected the perfect professional match. Please review the booking slot and confirm below.
+                        </ThemedText>
                       </View>
                     </View>
                   </View>
@@ -977,5 +1145,141 @@ const styles = StyleSheet.create({
   modalSignOutText: {
     color: '#FFFFFF',
     fontFamily: Typography.fonts.bold,
+  },
+
+  // HITL Approval Card
+  approvalCard: { 
+    padding: Spacing.lg, 
+    marginBottom: Spacing.lg, 
+    borderRadius: Radius.xl, 
+    borderColor: 'rgba(245, 158, 11, 0.3)', 
+    borderWidth: 1, 
+    backgroundColor: 'rgba(245, 158, 11, 0.05)' 
+  },
+  approvalHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: Spacing.sm, 
+    marginBottom: Spacing.lg 
+  },
+  approvalTitle: { 
+    fontSize: Typography.sizes.lg, 
+    fontFamily: Typography.fonts.bold, 
+    color: '#10B981' 
+  },
+  providerInfoRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: Spacing.md, 
+    marginBottom: Spacing.lg 
+  },
+  providerAvatar: { 
+    width: 48, 
+    height: 48, 
+    borderRadius: 24, 
+    backgroundColor: 'rgba(0, 243, 255, 0.15)', 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  providerAvatarText: { 
+    fontSize: Typography.sizes.xl, 
+    fontFamily: Typography.fonts.bold, 
+    color: Colors.dark.accent 
+  },
+  approvalProviderName: { 
+    fontSize: Typography.sizes.lg, 
+    fontFamily: Typography.fonts.bold, 
+    color: '#FFF' 
+  },
+  providerMeta: { 
+    flexDirection: 'row', 
+    gap: Spacing.sm, 
+    marginTop: 4 
+  },
+  metaChip: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4, 
+    backgroundColor: 'rgba(255,255,255,0.08)', 
+    borderRadius: Radius.sm, 
+    paddingHorizontal: 8, 
+    paddingVertical: 2 
+  },
+  metaText: { 
+    fontSize: 12, 
+    color: 'rgba(255,255,255,0.7)', 
+    fontFamily: Typography.fonts.medium 
+  },
+  approvalQuestion: { 
+    fontSize: Typography.sizes.md, 
+    color: 'rgba(255,255,255,0.7)', 
+    fontFamily: Typography.fonts.medium, 
+    textAlign: 'center', 
+    marginBottom: Spacing.lg 
+  },
+  feedbackInput: { 
+    backgroundColor: 'rgba(255,255,255,0.05)', 
+    borderRadius: Radius.md, 
+    padding: Spacing.md, 
+    color: '#FFF', 
+    fontFamily: Typography.fonts.primary, 
+    minHeight: 80, 
+    textAlignVertical: 'top', 
+    marginBottom: Spacing.lg, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255,255,255,0.1)' 
+  },
+  approvalButtons: { 
+    flexDirection: 'row', 
+    gap: Spacing.md 
+  },
+  cancelBtn: { 
+    flex: 1, 
+    paddingVertical: Spacing.sm + 4, 
+    borderRadius: Radius.full, 
+    borderWidth: 1, 
+    borderColor: 'rgba(255, 75, 75, 0.4)', 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  cancelBtnText: { 
+    color: '#FF4B4B', 
+    fontFamily: Typography.fonts.bold, 
+    fontSize: Typography.sizes.md 
+  },
+  confirmBtn: { 
+    flex: 1.5, 
+    paddingVertical: Spacing.sm + 4, 
+    borderRadius: Radius.full, 
+    backgroundColor: Colors.dark.accent, 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  confirmBtnText: { 
+    color: '#000', 
+    fontFamily: Typography.fonts.bold, 
+    fontSize: Typography.sizes.md 
+  },
+
+  // Cancelled state
+  cancelledCard: { 
+    padding: Spacing.lg, 
+    marginBottom: Spacing.lg, 
+    alignItems: 'center', 
+    gap: Spacing.sm, 
+    borderRadius: Radius.xl, 
+    borderColor: 'rgba(255, 75, 75, 0.2)', 
+    borderWidth: 1 
+  },
+  cancelledTitle: {
+    fontSize: Typography.sizes.lg,
+    fontFamily: Typography.fonts.bold,
+    color: '#FF4B4B',
+  },
+  cancelledText: { 
+    color: 'rgba(255,255,255,0.7)', 
+    textAlign: 'center', 
+    fontSize: Typography.sizes.sm,
+    marginBottom: Spacing.sm
   },
 });

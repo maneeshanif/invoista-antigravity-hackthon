@@ -64,6 +64,9 @@ class SessionBase(BaseModel):
     status: str
     started_at: datetime
     completed_at: Optional[datetime] = None
+    hitl_status: Optional[str] = None
+    hitl_state: Optional[Dict[str, Any]] = None
+    provider_summary: Optional[Dict[str, Any]] = None
 
 class Session(SessionBase):
     id: uuid.UUID
