@@ -30,7 +30,7 @@ import type { Provider, TraceLog } from '@/lib/api';
 export default function ProviderSelectionScreen() {
   const { sessionId } = useLocalSearchParams<{ sessionId: string }>();
   const router = useRouter();
-  const { exportSessionTrace, getProvider } = useApi();
+  const { exportSessionTrace, getProvider, getSession } = useApi();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -49,13 +49,24 @@ export default function ProviderSelectionScreen() {
         const bookingTrace = traces.find(
           (t) =>
             t.tool_used === 'create_booking' ||
+            t.tool_used === 'run_booking' ||
+            t.tool_used === 'create_booking_tool' ||
             t.agent_name?.toLowerCase().includes('booking')
         );
 
         if (bookingTrace?.output_payload) {
           const payload = bookingTrace.output_payload as Record<string, unknown>;
           const bId = (payload.booking_id ?? payload.id) as string | undefined;
-          const pId = payload.provider_id as string | undefined;
+          let pId = payload.provider_id as string | undefined;
+
+          if (!pId) {
+            try {
+              const session = await getSession(sessionId);
+              pId = session.provider_summary?.provider_id;
+            } catch (err) {
+              console.error('Failed to fetch session for provider_id fallback:', err);
+            }
+          }
 
           if (bId) setBookingId(bId);
 

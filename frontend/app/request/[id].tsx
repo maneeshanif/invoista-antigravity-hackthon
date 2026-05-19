@@ -132,11 +132,19 @@ export default function RequestStatusScreen() {
       const fetchBooking = async () => {
         try {
           const { traces } = await exportSessionTrace(sessionId) as any;
-          const bookingTrace = traces.find((t: any) => t.tool_used === 'create_booking');
+          const bookingTrace = traces.find(
+            (t: any) =>
+              t.tool_used === 'create_booking' ||
+              t.tool_used === 'run_booking' ||
+              t.tool_used === 'create_booking_tool'
+          );
           if (bookingTrace?.output_payload) {
             const { booking_id, provider_id } = bookingTrace.output_payload as any;
-            const provider = await getProvider(provider_id);
-            setBookingData({ provider, bookingId: booking_id });
+            const pId = provider_id || providerSummary?.provider_id;
+            if (booking_id && pId) {
+              const provider = await getProvider(pId);
+              setBookingData({ provider, bookingId: booking_id });
+            }
           }
         } catch (err) {
           console.error("Failed to load booking info:", err);

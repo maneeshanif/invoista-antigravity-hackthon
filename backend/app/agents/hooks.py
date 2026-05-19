@@ -180,6 +180,7 @@ class TraceRunHooks(RunHooksBase):
             
             if booking_id:
                 self.has_booking_created = True
+                output_payload["booking_id"] = booking_id
                 
             if booking_id:
                 try:
@@ -187,6 +188,7 @@ class TraceRunHooks(RunHooksBase):
                     booking_resp = supabase_client.table("bookings").select("provider_id").eq("id", booking_id).single().execute()
                     if booking_resp.data and booking_resp.data.get("provider_id"):
                         prov_id = booking_resp.data["provider_id"]
+                        output_payload["provider_id"] = prov_id
                         prov_resp = supabase_client.table("providers").select("name").eq("id", prov_id).single().execute()
                         if prov_resp.data and prov_resp.data.get("name"):
                             provider_name = prov_resp.data["name"]
@@ -198,6 +200,9 @@ class TraceRunHooks(RunHooksBase):
         elif "run_followup" in tool_name or "schedule_followup" in tool_name or "schedule_followups" in tool_name:
             output_summary = "Scheduled automated reminders for the appointment and created follow-up tasks to ensure quality service."
             
+        elif "run_notification" in tool_name or "send_booking_emails" in tool_name:
+            output_summary = "Dispatched booking confirmation emails to both the user and the service provider."
+
         # Write to DB via program trace logging
         await self._write_log(
             agent_name=agent.name,

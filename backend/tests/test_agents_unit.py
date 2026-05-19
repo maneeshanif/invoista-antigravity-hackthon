@@ -51,6 +51,7 @@ async def test_run_workflow_fallback():
          patch("app.agents.orchestrator.create_ranking_agent") as mock_create_rank, \
          patch("app.agents.orchestrator.create_booking_agent") as mock_create_book, \
          patch("app.agents.orchestrator.create_followup_agent") as mock_create_follow, \
+         patch("app.agents.orchestrator.create_notification_agent") as mock_create_notif, \
          patch("app.agents.orchestrator.create_session") as mock_create_sess, \
          patch("app.agents.orchestrator.update_session_status") as mock_update_sess:
         
@@ -62,6 +63,7 @@ async def test_run_workflow_fallback():
         mock_create_rank.return_value = MagicMock()
         mock_create_book.return_value = MagicMock()
         mock_create_follow.return_value = MagicMock()
+        mock_create_notif.return_value = MagicMock()
         
         from openai import APIStatusError
         fallback_res = MagicMock()

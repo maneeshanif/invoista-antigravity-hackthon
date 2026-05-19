@@ -26,6 +26,9 @@ from mcp_server.tools.notification_tools import (
     ScheduleFollowupsInput,
     ScheduleFollowupsOutput,
     schedule_followups,
+    SendBookingEmailsInput,
+    SendBookingEmailsOutput,
+    send_booking_emails,
 )
 from mcp_server.tools.provider_tools import (
     FindProvidersInput,
@@ -102,6 +105,14 @@ def schedule_followups_tool(input: ScheduleFollowupsInput) -> ScheduleFollowupsO
     for the booking. These will be dispatched by the Celery worker.
     """
     return schedule_followups(input)
+
+
+@mcp.tool()
+def send_booking_emails_tool(input: SendBookingEmailsInput) -> SendBookingEmailsOutput:
+    """
+    Dispatch booking confirmation emails to both the user and the provider.
+    """
+    return send_booking_emails(input)
 
 
 @mcp.tool()

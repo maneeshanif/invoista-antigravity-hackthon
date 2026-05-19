@@ -41,7 +41,12 @@ from mcp_server.tools.ranking_tools import (
     rank_providers,
 )
 from mcp_server.tools.booking_tools import CreateBookingInput, create_booking
-from mcp_server.tools.notification_tools import ScheduleFollowupsInput, schedule_followups
+from mcp_server.tools.notification_tools import (
+    ScheduleFollowupsInput,
+    schedule_followups,
+    SendBookingEmailsInput,
+    send_booking_emails,
+)
 from mcp_server.tools.trace_tools import WriteTraceLogInput, write_trace_log
 from mcp_server.db import supabase_client
 
@@ -309,6 +314,25 @@ def test_schedule_followups():
 
 
 # ===========================================================================
+# TEST 6.5 — send_booking_emails (fetch and mock/send SMTP)
+# ===========================================================================
+
+@run_test("send_booking_emails — sends confirmation emails to user and provider")
+def test_send_booking_emails():
+    result = send_booking_emails(
+        SendBookingEmailsInput(
+            booking_id=_booking_id,
+            user_id=DEMO_USER_ID,
+            provider_id=PROVIDER_ALI,
+        )
+    )
+    print(f"    ➜ send_booking_emails result: {result}")
+    assert_eq("success", result.success, True)
+    assert_eq("user_email_sent", result.user_email_sent, True)
+    assert_eq("provider_email_sent", result.provider_email_sent, True)
+
+
+# ===========================================================================
 # TEST 7 — write_trace_log: WRITES a session + trace_log row
 # ===========================================================================
 
@@ -411,6 +435,7 @@ if __name__ == "__main__":
     test_create_booking()
     test_create_booking_double()
     test_schedule_followups()
+    test_send_booking_emails()
     test_write_trace_log()
 
     # ---------------------------------------------------------------------------

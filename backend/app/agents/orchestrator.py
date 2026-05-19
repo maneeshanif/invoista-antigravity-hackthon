@@ -38,6 +38,7 @@ from app.agents.discovery_agent import create_discovery_agent
 from app.agents.ranking_agent import create_ranking_agent
 from app.agents.booking_agent import create_booking_agent
 from app.agents.followup_agent import create_followup_agent
+from app.agents.notification_agent import create_notification_agent
 from app.core.config import settings
 
 
@@ -61,12 +62,14 @@ def _build_orchestrator(
     ranking_agent   = create_ranking_agent(mcp)
     booking_agent   = create_booking_agent(mcp)
     followup_agent  = create_followup_agent(mcp)
+    notification_agent = create_notification_agent(mcp)
 
     if trace_agent_hooks:
         discovery_agent.hooks = trace_agent_hooks
         ranking_agent.hooks   = trace_agent_hooks
         booking_agent.hooks   = trace_agent_hooks
         followup_agent.hooks  = trace_agent_hooks
+        notification_agent.hooks = trace_agent_hooks
 
     tools = [
         discovery_agent.as_tool(
@@ -89,6 +92,10 @@ def _build_orchestrator(
         followup_agent.as_tool(
             tool_name="run_followup",
             tool_description="Schedule follow-up notifications. Pass booking_id, user_id, slot_date, and slot_time."
+        ),
+        notification_agent.as_tool(
+            tool_name="run_notification",
+            tool_description="Send email confirmation notifications to both the user and the provider. Pass booking_id, user_id, and provider_id."
         ),
     ]
 

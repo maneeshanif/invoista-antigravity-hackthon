@@ -19,7 +19,8 @@ def override_auth():
         preferred_language="en",
         area="G-13",
         lat=33.0,
-        lng=72.0
+        lng=72.0,
+        email="test_user@example.com"
     )
     yield
     app.dependency_overrides.clear()

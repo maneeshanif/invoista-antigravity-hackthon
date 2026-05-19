@@ -79,3 +79,162 @@ def schedule_followups(input: ScheduleFollowupsInput) -> ScheduleFollowupsOutput
     ]
 
     return ScheduleFollowupsOutput(scheduled=scheduled)
+
+
+class SendBookingEmailsInput(BaseModel):
+    booking_id: str = Field(..., description="UUID of the booking to send notification emails for")
+    user_id: str = Field(..., description="UUID of the user who booked the service")
+    provider_id: str = Field(..., description="UUID of the service provider")
+
+
+class SendBookingEmailsOutput(BaseModel):
+    success: bool
+    user_email_sent: bool
+    provider_email_sent: bool
+    details: str
+
+
+def send_booking_emails(input: SendBookingEmailsInput) -> SendBookingEmailsOutput:
+    """
+    Fetches booking, slot, user, and provider details, then dispatches
+    confirmation emails to both the user and provider via SMTP.
+    """
+    import os
+    import smtplib
+    import ssl
+    from email.mime.text import MIMEText
+    from email.mime.multipart import MIMEMultipart
+
+    # 1. Fetch booking
+    booking_resp = supabase_client.table("bookings").select("*").eq("id", input.booking_id).single().execute()
+    booking = booking_resp.data
+    if not booking:
+        return SendBookingEmailsOutput(
+            success=False,
+            user_email_sent=False,
+            provider_email_sent=False,
+            details=f"Booking {input.booking_id} not found."
+        )
+
+    # 2. Fetch slot
+    slot_resp = supabase_client.table("provider_slots").select("*").eq("id", booking["slot_id"]).single().execute()
+    slot = slot_resp.data
+    if not slot:
+        return SendBookingEmailsOutput(
+            success=False,
+            user_email_sent=False,
+            provider_email_sent=False,
+            details=f"Slot {booking['slot_id']} not found."
+        )
+
+    # 3. Fetch user
+    user_resp = supabase_client.table("users").select("*").eq("id", input.user_id).single().execute()
+    user = user_resp.data
+    if not user:
+        return SendBookingEmailsOutput(
+            success=False,
+            user_email_sent=False,
+            provider_email_sent=False,
+            details=f"User {input.user_id} not found."
+        )
+
+    # 4. Fetch provider
+    provider_resp = supabase_client.table("providers").select("*").eq("id", input.provider_id).single().execute()
+    provider = provider_resp.data
+    if not provider:
+        return SendBookingEmailsOutput(
+            success=False,
+            user_email_sent=False,
+            provider_email_sent=False,
+            details=f"Provider {input.provider_id} not found."
+        )
+
+    user_email = user.get("email")
+    provider_email = provider.get("email")
+
+    if not user_email:
+        print(f"⚠️ User {user['name']} has no email set.")
+    if not provider_email:
+        print(f"⚠️ Provider {provider['name']} has no email set.")
+
+    # Email content details
+    slot_date = slot["slot_date"]
+    slot_time = slot["slot_time"]
+    provider_name = provider["name"]
+
+    user_subject = "Booking Confirmation"
+    user_body = f"Your appointment with {provider_name} for the requested service is scheduled on {slot_date} at {slot_time}. Please be ready for that."
+
+    provider_subject = "New Service Booking Received"
+    provider_body = f"You got a new client. Please be ready to serve them on {slot_date} at {slot_time}."
+
+    # SMTP configuration
+    smtp_host = os.environ.get("SMTP_HOST", "smtp.gmail.com").strip()
+    smtp_port = os.environ.get("SMTP_PORT", "465").strip()
+    smtp_username = os.environ.get("SMTP_USERNAME", "").strip()
+    smtp_password = os.environ.get("SMTP_PASSWORD", "").strip()
+
+    user_email_sent = False
+    provider_email_sent = False
+    error_msgs = []
+
+    # Helper function to send single email
+    def dispatch_email(recipient_email: str, subject: str, body: str) -> bool:
+        if not recipient_email:
+            error_msgs.append("Missing recipient email address.")
+            return False
+
+        if not smtp_username or not smtp_password:
+            # Running in mock mode
+            print(f"[MOCK EMAIL SUCCESS] To: {recipient_email} | Subject: {subject} | Body: {body}")
+            return True
+
+        msg = MIMEMultipart()
+        msg["From"] = smtp_username
+        msg["To"] = recipient_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "plain"))
+
+        try:
+            port = int(smtp_port)
+            if port == 465:
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(smtp_host, port, context=context) as server:
+                    server.login(smtp_username, smtp_password)
+                    server.sendmail(smtp_username, recipient_email, msg.as_string())
+            else:
+                with smtplib.SMTP(smtp_host, port) as server:
+                    server.starttls()
+                    server.login(smtp_username, smtp_password)
+                    server.sendmail(smtp_username, recipient_email, msg.as_string())
+            return True
+        except Exception as e:
+            err = f"SMTP error dispatching to {recipient_email}: {e}"
+            print(err)
+            error_msgs.append(err)
+            raise e
+
+    # Send both emails
+    try:
+        if user_email:
+            user_email_sent = dispatch_email(user_email, user_subject, user_body)
+        if provider_email:
+            provider_email_sent = dispatch_email(provider_email, provider_subject, provider_body)
+    except Exception as e:
+        return SendBookingEmailsOutput(
+            success=False,
+            user_email_sent=user_email_sent,
+            provider_email_sent=provider_email_sent,
+            details=f"Failed to dispatch emails: {e}"
+        )
+
+    success = (user_email_sent or not user_email) and (provider_email_sent or not provider_email)
+    details = "Emails sent successfully." if success else "; ".join(error_msgs)
+
+    return SendBookingEmailsOutput(
+        success=success,
+        user_email_sent=user_email_sent,
+        provider_email_sent=provider_email_sent,
+        details=details
+    )
+

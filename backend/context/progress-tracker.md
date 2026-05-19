@@ -29,6 +29,8 @@ Update this file whenever the current phase, active feature, or implementation s
 - `context/feature-specs/08-hooks-implementation.md` (Hooks Implementation Spec)
 - Implement `Feature 08 - Hooks Implementation` (TraceRunHooks and TraceAgentHooks implemented).
 - `context/feature-specs/09-clerk-authentication-sync.md` (Clerk Authentication Sync Spec)
+- `context/feature-specs/11-notification-agent.md` (Notification Agent Workflow Spec)
+- Implement `Feature 11 - Notification Agent` (Specialist Notification Agent, database email fields migration SQL, SMTP integration, sequential orchestrator integration, trace hooks logging).
 
 ## In Progress
 

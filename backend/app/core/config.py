@@ -28,6 +28,11 @@ class Settings(BaseSettings):
     CLERK_PUBLISHABLE_KEY: str = ""
     
     REDIS_URL: str = "redis://localhost:6379"
+
+    SMTP_HOST: str = "smtp.gmail.com"
+    SMTP_PORT: int = 465
+    SMTP_USERNAME: str = ""
+    SMTP_PASSWORD: str = ""
     
     model_config = SettingsConfigDict(
         env_file=str(BASE_DIR / ".env"), 

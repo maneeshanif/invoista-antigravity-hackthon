@@ -13,6 +13,7 @@ class UserBase(BaseModel):
     area: str
     lat: float
     lng: float
+    email: Optional[str] = None
 
 class User(UserBase):
     id: uuid.UUID
