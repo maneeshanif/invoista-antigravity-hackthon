@@ -92,6 +92,7 @@ export interface User {
   area: string;
   lat: number;
   lng: number;
+  email?: string | null;
 }
 
 export interface Notification {
@@ -109,6 +110,8 @@ export interface FollowupTrigger {
   booking_id: string;
 }
 
+let userEmail: string | null = null;
+
 // ─── API Client Factory ───────────────────────────────────────────────────────
 
 async function request<T>(
@@ -125,6 +128,10 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
+  if (userEmail) {
+    headers['X-User-Email'] = userEmail;
+  }
+
   const res = await fetch(`${BASE_URL}${path}`, { ...options, headers });
 
   if (!res.ok) {
@@ -138,6 +145,11 @@ async function request<T>(
 // ─── Public API Functions (token injected by hook) ────────────────────────────
 
 export const api = {
+  // Set current user email for X-User-Email header
+  setEmailHeader: (email: string | null) => {
+    userEmail = email;
+  },
+
   // Health
   health: (token?: string | null) =>
     request<{ status: string; version: string }>('/health', {}, token),

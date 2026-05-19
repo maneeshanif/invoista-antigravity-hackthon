@@ -1,6 +1,5 @@
-// frontend/lib/useApi.ts
 import { useMemo } from 'react';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { api } from './api';
 
 /**
@@ -9,8 +8,12 @@ import { api } from './api';
  */
 export function useApi() {
   const { getToken } = useAuth();
+  const { user } = useUser();
 
   return useMemo(() => {
+    const email = user?.primaryEmailAddress?.emailAddress ?? null;
+    api.setEmailHeader(email);
+
     const withToken = async <T>(fn: (token: string | null) => Promise<T>): Promise<T> => {
       const token = await getToken();
       return fn(token);

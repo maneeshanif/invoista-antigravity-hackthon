@@ -1,6 +1,6 @@
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts, Outfit_400Regular, Outfit_500Medium, Outfit_700Bold } from '@expo-google-fonts/outfit';
-import { ClerkProvider, useAuth } from '@clerk/expo';
+import { ClerkProvider, useAuth, useUser } from '@clerk/expo';
 import { tokenCache } from '@/lib/auth';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
@@ -9,6 +9,8 @@ import { useEffect } from 'react';
 import 'react-native-reanimated';
 import Toast from 'react-native-toast-message';
 import { useNotificationsPolling } from '@/hooks/useNotificationsPolling';
+import { api } from '@/lib/api';
+
 
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Colors } from '@/constants/theme';
@@ -28,10 +30,19 @@ export const unstable_settings = {
 
 function InitialLayout() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { user } = useUser();
   const segments = useSegments();
   const router = useRouter();
 
   useNotificationsPolling();
+
+  useEffect(() => {
+    if (user) {
+      api.setEmailHeader(user.primaryEmailAddress?.emailAddress ?? null);
+    } else {
+      api.setEmailHeader(null);
+    }
+  }, [user]);
 
   useEffect(() => {
     console.log('Auth State:', { isLoaded, isSignedIn, segments });
