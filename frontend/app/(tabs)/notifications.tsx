@@ -1,28 +1,27 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Alert, ActivityIndicator } from 'react-native';
 import { useNotificationStore } from '@/store/useNotificationStore';
-import { api } from '@/lib/api';
-import { useAuth } from '@clerk/expo';
+import { useApi } from '@/lib/useApi';
 import { Colors, Typography } from '@/constants/theme';
-import { Bell, CheckCircle2, MessageSquare } from 'lucide-react-native';
+import { Bell, CheckCircle2, MessageSquare, Trash2, XCircle } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 export default function NotificationsScreen() {
   const { notifications, markAsRead, setNotifications } = useNotificationStore();
-  const { getToken } = useAuth();
+  const { getMyNotifications, readNotification, deleteNotification, bulkDeleteNotifications } = useApi();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
 
   const fetchLatest = useCallback(async () => {
     try {
-      const token = await getToken();
-      if (!token) return;
-      const data = await api.getMyNotifications(token);
+      const data = await getMyNotifications();
       setNotifications(data);
     } catch (e) {
       console.error('Failed to fetch notifications on demand:', e);
     }
-  }, [getToken, setNotifications]);
+  }, [getMyNotifications, setNotifications]);
 
   useEffect(() => {
     fetchLatest();
@@ -37,17 +36,66 @@ export default function NotificationsScreen() {
   const handleRead = async (id: string, isRead: boolean) => {
     if (isRead) return;
     try {
-      const token = await getToken();
-      if (!token) return;
-      await api.readNotification(id, token);
+      await readNotification(id);
       markAsRead(id);
     } catch (e) {
       console.error('Failed to mark notification as read:', e);
     }
   };
 
+  const handleDelete = (id: string) => {
+    Alert.alert(
+      'Delete Notification',
+      'Remove this notification?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeletingId(id);
+            try {
+              await deleteNotification(id);
+              setNotifications(notifications.filter(n => n.id !== id));
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Could not delete notification.');
+            } finally {
+              setDeletingId(null);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleBulkDelete = () => {
+    if (notifications.length === 0) return;
+    Alert.alert(
+      'Clear All Notifications',
+      `Remove all ${notifications.length} notification${notifications.length > 1 ? 's' : ''}?`,
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Clear All',
+          style: 'destructive',
+          onPress: async () => {
+            setBulkDeleting(true);
+            try {
+              const ids = notifications.map(n => n.id);
+              await bulkDeleteNotifications(ids);
+              setNotifications([]);
+            } catch (e: any) {
+              Alert.alert('Error', e.message ?? 'Could not clear notifications.');
+            } finally {
+              setBulkDeleting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   const handleAction = (n: any) => {
-    // If it's a booking notification, maybe go to booking details
     if (n.booking_id) {
       router.push(`/booking/${n.booking_id}`);
     }
@@ -56,9 +104,10 @@ export default function NotificationsScreen() {
   const renderItem = ({ item }: { item: any }) => {
     const isRead = item.status === 'read';
     const isFollowup = item.type === 'followup';
+    const isDeleting = deletingId === item.id;
 
     return (
-      <TouchableOpacity 
+      <TouchableOpacity
         style={[styles.notificationCard, !isRead && styles.unreadCard]}
         onPress={() => {
           handleRead(item.id, isRead);
@@ -74,7 +123,7 @@ export default function NotificationsScreen() {
           )}
         </View>
         <View style={styles.contentContainer}>
-          <View style={styles.headerRow}>
+          <View style={styles.cardHeaderRow}>
             <Text style={styles.typeText}>{isFollowup ? 'Follow-up Request' : 'Booking Update'}</Text>
             {!isRead && <View style={styles.unreadDot} />}
           </View>
@@ -83,13 +132,42 @@ export default function NotificationsScreen() {
             {new Date(item.scheduled_at).toLocaleString()}
           </Text>
         </View>
+        <TouchableOpacity
+          style={styles.deleteBtn}
+          onPress={() => handleDelete(item.id)}
+          disabled={isDeleting}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          {isDeleting
+            ? <ActivityIndicator size="small" color="#FF4B4B" />
+            : <Trash2 size={16} color="#FF4B4B" />
+          }
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Notifications</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.header}>Notifications</Text>
+        {notifications.length > 0 && (
+          <TouchableOpacity
+            style={[styles.clearAllBtn, bulkDeleting && styles.clearAllBtnDisabled]}
+            onPress={handleBulkDelete}
+            disabled={bulkDeleting}
+            activeOpacity={0.7}
+          >
+            {bulkDeleting
+              ? <ActivityIndicator size="small" color="#FF4B4B" />
+              : <XCircle size={14} color="#FF4B4B" />
+            }
+            <Text style={styles.clearAllText}>
+              {bulkDeleting ? 'Clearing…' : 'Clear All'}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}
@@ -120,12 +198,36 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.dark.background,
     paddingTop: 60,
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
   header: {
     fontFamily: Typography.fonts.bold,
     fontSize: 28,
     color: Colors.dark.text,
-    paddingHorizontal: 20,
-    marginBottom: 20,
+  },
+  clearAllBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255, 75, 75, 0.1)',
+    borderColor: 'rgba(255, 75, 75, 0.3)',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  clearAllBtnDisabled: {
+    opacity: 0.5,
+  },
+  clearAllText: {
+    fontFamily: Typography.fonts.medium,
+    fontSize: 13,
+    color: '#FF4B4B',
   },
   listContent: {
     paddingHorizontal: 20,
@@ -140,6 +242,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.dark.border,
+    alignItems: 'center',
   },
   unreadCard: {
     borderColor: 'rgba(0, 243, 255, 0.3)',
@@ -153,7 +256,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     flex: 1,
   },
-  headerRow: {
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -184,6 +287,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.5)',
   },
+  deleteBtn: {
+    marginLeft: 12,
+    padding: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -196,3 +305,4 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
 });
+

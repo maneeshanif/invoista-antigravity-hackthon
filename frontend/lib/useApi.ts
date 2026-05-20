@@ -37,14 +37,19 @@ export function useApi() {
         withToken((t) => api.createBooking(body, t)),
       getBooking: (id: string) => withToken((t) => api.getBooking(id, t)),
       cancelBooking: (id: string) => withToken((t) => api.cancelBooking(id, t)),
+      bulkCancelBookings: (ids: string[]) => withToken((t) => api.bulkCancelBookings(ids, t)),
       getMyProfile: () => withToken((t) => api.getMyProfile(t)),
+      getMyBookings: () => withToken((t) => api.getMyBookings(t)),
+      getMyNotifications: () => withToken((t) => api.getMyNotifications(t)),
+      readNotification: (id: string) => withToken((t) => api.readNotification(id, t)),
+      deleteNotification: (id: string) => withToken((t) => api.deleteNotification(id, t)),
+      bulkDeleteNotifications: (ids: string[]) => withToken((t) => api.bulkDeleteNotifications(ids, t)),
       triggerFollowup: (body: Parameters<typeof api.triggerFollowup>[0]) =>
         withToken((t) => api.triggerFollowup(body, t)),
       adminListTraces: () => withToken((t) => api.adminListTraces(t)),
       adminListSessions: () => withToken((t) => api.adminListSessions(t)),
       adminListBookings: () => withToken((t) => api.adminListBookings(t)),
       adminListProviders: () => withToken((t) => api.adminListProviders(t)),
-      getMyBookings: () => withToken((t) => api.getMyBookings(t)),
     };
   }, [getToken]);
 }

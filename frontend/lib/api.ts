@@ -202,6 +202,30 @@ export const api = {
   cancelBooking: (id: string, token?: string | null) =>
     request<Booking>(`/bookings/${id}/cancel`, { method: 'POST' }, token),
 
+  bulkCancelBookings: (ids: string[], token?: string | null) =>
+    request<{ cancelled: number; booking_ids: string[] }>(
+      '/bookings/bulk-cancel',
+      { method: 'POST', body: JSON.stringify({ booking_ids: ids }) },
+      token,
+    ),
+
+  // Notifications
+  getNotifications: (token?: string | null) =>
+    request<Notification[]>('/notifications/', {}, token),
+
+  readNotification: (id: string, token?: string | null) =>
+    request<{ message: string }>(`/notifications/${id}/read`, { method: 'POST' }, token),
+
+  deleteNotification: (id: string, token?: string | null) =>
+    request<{ message: string }>(`/notifications/${id}`, { method: 'DELETE' }, token),
+
+  bulkDeleteNotifications: (ids: string[], token?: string | null) =>
+    request<{ deleted: number; notification_ids: string[] }>(
+      '/notifications/bulk-delete',
+      { method: 'POST', body: JSON.stringify({ notification_ids: ids }) },
+      token,
+    ),
+
   // Me
   getMyProfile: (token?: string | null) =>
     request<User>('/me/', {}, token),
@@ -210,10 +234,7 @@ export const api = {
     request<Booking[]>('/me/bookings', {}, token),
 
   getMyNotifications: (token?: string | null) =>
-    request<Notification[]>('/me/notifications', {}, token),
-
-  readNotification: (id: string, token?: string | null) =>
-    request<{ message: string }>(`/me/notifications/${id}/read`, { method: 'POST' }, token),
+    request<Notification[]>('/notifications/', {}, token),
 
   // Followups
   triggerFollowup: (body: FollowupTrigger, token?: string | null) =>

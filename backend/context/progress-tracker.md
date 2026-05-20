@@ -12,7 +12,6 @@ Update this file whenever the current phase, active feature, or implementation s
 
 ## Completed
 
-- Split architecture context into `project-overview.md`, `architecture-context.md`, `code-standards.md`, and `ai-workflow-rules.md`.
 - `context/feature-specs/01-project-intialization.md` (Project Initialization)
 - `context/feature-specs/02-db-setup.md` (Database Setup Spec)
 - Implement `Feature 01 - Initialize Project` (FastAPI backend with `uv`, basic config).
@@ -31,11 +30,14 @@ Update this file whenever the current phase, active feature, or implementation s
 - `context/feature-specs/09-clerk-authentication-sync.md` (Clerk Authentication Sync Spec)
 - `context/feature-specs/11-notification-agent.md` (Notification Agent Workflow Spec)
 - Implement `Feature 11 - Notification Agent` (Specialist Notification Agent, database email fields migration SQL, SMTP integration, sequential orchestrator integration, trace hooks logging).
+- Implement `Feature 12 - Arrival Timer Worker` (Background task for provider departure/arrival notifications and booking status updates).
+- `context/feature-specs/13-post-booking-notification-fixes.md` (Post-Booking Webhook Notification & Follow-Up Fixes)
+- Implement `Feature 09 - Clerk Authentication Sync` (JIT User Provisioning & JWT Validation via signature check or DB fallback).
+- Implement `Feature 13 - Post-Booking Webhook Notification & Follow-Up Fixes` (Hoisted `supabase_client` import, validated `slot_id` to prevent placeholder fallbacks, and added comprehensive diagnostic logging for all 3 post-booking sequential actions: email confirmations, follow-up notifications scheduling, and arrival timer launching).
+- Implement `Feature 14 - Vapi User/Session ID Resolution & Toast Notifications` (Decoupled Vapi tool payload parsing, implemented robust session & user ID extraction from Bearer JWT headers and custom variables, corrected DB-level association, and added premium Toast alert triggers with custom type-specific titles).
+- Implement `Feature 14 Hardening - Vapi Webhook Tool Pipeline Hardening` (Extracted `_resolve_context` helper called once before tool loop; removed redundant `user_id` re-fetch inside `create_booking`; moved `write_trace_log` to after all post-booking steps with `emails_ok/followups_ok/timer_ok` outcome flags; introduced `AGENT_DISCOVERY`, `TOOL_FIND_PROVIDERS`, `AGENT_BOOKING`, `TOOL_CREATE_BOOKING` constants to prevent trace name drift).
 
 ## In Progress
-
-- Implement `Feature 09 - Clerk Authentication Sync` (JIT User Provisioning & JWT Validation)
-- Connect backend API with frontend.
 
 - Connect backend API with frontend.
 

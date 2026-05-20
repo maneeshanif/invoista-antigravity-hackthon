@@ -102,20 +102,28 @@ def create_booking(input: CreateBookingInput) -> CreateBookingOutput:
     confirmation_code = _generate_confirmation_code()
     booked_at = datetime.now(timezone.utc).isoformat()
 
-    # 2. Create booking
+    # 2. Create booking — insert without chained .select() to avoid PGRST116
+    # (supabase-py v2 + PostgREST can return PGRST116 when insert+select returns
+    #  0 rows due to representation-mode; we fetch separately instead.)
+    supabase_client.table("bookings").insert(
+        {
+            "user_id": input.user_id,
+            "provider_id": input.provider_id,
+            "slot_id": input.slot_id,
+            "status": "confirmed",
+            "confirmation_code": confirmation_code,
+            "booked_at": booked_at,
+        }
+    ).execute()
+
+    # 2b. Fetch the newly created booking row
     booking_resp = (
         supabase_client.table("bookings")
-        .insert(
-            {
-                "user_id": input.user_id,
-                "provider_id": input.provider_id,
-                "slot_id": input.slot_id,
-                "status": "confirmed",
-                "confirmation_code": confirmation_code,
-                "booked_at": booked_at,
-            }
-        )
         .select("*")
+        .eq("user_id", input.user_id)
+        .eq("slot_id", input.slot_id)
+        .order("booked_at", desc=True)
+        .limit(1)
         .execute()
     )
     booking = booking_resp.data[0] if booking_resp.data else None

@@ -63,7 +63,8 @@ async def get_current_user(
             signing_key.key,
             algorithms=["RS256"],
             issuer=iss,
-            options={"verify_aud": False}
+            options={"verify_aud": False},
+            leeway=120
         )
         
         clerk_user_id = payload.get("sub")

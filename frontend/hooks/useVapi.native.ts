@@ -157,7 +157,7 @@ export default function useVapi(): VapiCallHook {
     // Fetch Clerk JWT token (hook already called at top level)
     let token: string | undefined;
     try {
-      token = await getToken();
+      token = await getToken({ template: 'vapi' });
     } catch (e) {
       // ignore if not available
     }

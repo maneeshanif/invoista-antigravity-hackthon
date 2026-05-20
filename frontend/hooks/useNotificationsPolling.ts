@@ -9,6 +9,7 @@ export const useNotificationsPolling = (intervalMs: number = 10000) => {
   const { getToken, isSignedIn } = useAuth();
   const appState = useRef(AppState.currentState);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const hasLoadedRef = useRef(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -32,19 +33,30 @@ export const useNotificationsPolling = (intervalMs: number = 10000) => {
         // Check for new notifications to trigger a toast
         const previousIds = new Set(prevNotifications.map(n => n.id));
         const newlyAdded = newNotifications.filter(n => !previousIds.has(n.id) && n.status !== 'read');
+        console.log('[useNotificationsPolling] Newly added notifications:', newlyAdded.map(n => n.type));
+        if (newlyAdded.length > 0 && hasLoadedRef.current) {
+          const getToastTitle = (type: string) => {
+            switch(type) {
+              case 'provider_departed': return 'Provider En Route 🚗';
+              case 'provider_arrived': return 'Provider Arrived 📍';
+              case 'reminder': return 'Service Reminder ⏰';
+              case 'completion_check': return 'Service Completed? ✅';
+              case 'followup': return 'Follow-up Request 📋';
+              default: return 'New Notification 🔔';
+            }
+          };
 
-        if (newlyAdded.length > 0 && prevNotifications.length > 0) {
-          // Only show toast if we already had notifications (avoid spam on initial load)
           newlyAdded.forEach(n => {
             Toast.show({
               type: 'info',
-              text1: n.type === 'followup' ? 'Follow-up Request' : 'New Notification',
+              text1: getToastTitle(n.type),
               text2: n.message,
               position: 'top',
             });
           });
         }
 
+        hasLoadedRef.current = true;
         store.setNotifications(newNotifications);
         store.setBookings(newBookings);
       } catch (error) {
@@ -57,6 +69,7 @@ export const useNotificationsPolling = (intervalMs: number = 10000) => {
       if (store.notifications.length > 0 || store.bookings.length > 0) {
         store.clearStore();
       }
+      hasLoadedRef.current = false;
       if (intervalRef.current) clearInterval(intervalRef.current);
       return;
     }

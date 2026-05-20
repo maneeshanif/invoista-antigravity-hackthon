@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Vapi from '@vapi-ai/web';
 import type { VapiCallHook, ActiveToolCall } from './useVapi';
+import { useAuth } from '@clerk/expo';
 
 const VAPI_PUBLIC_KEY = process.env.EXPO_PUBLIC_VAPI_API_KEY || 'your-public-key';
 const VAPI_ASSISTANT_ID = process.env.EXPO_PUBLIC_VAPI_ASSISTANT_ID || 'your-assistant-id';
@@ -19,6 +20,7 @@ function getVapiInstance(): Vapi | null {
 }
 
 export default function useVapi(): VapiCallHook {
+  const { getToken } = useAuth();
   const [isCalling, setIsCalling] = useState(false);
   const [callState, setCallState] = useState<'idle' | 'connecting' | 'connected' | 'ended' | 'error'>('idle');
   const [isMuted, setIsMuted] = useState(false);
@@ -107,7 +109,7 @@ export default function useVapi(): VapiCallHook {
       vapi.off('call-end', onCallEnd);
       vapi.off('error', onError);
       vapi.off('message', onMessage);
-      
+
       try {
         vapi.stop();
       } catch (e) {
@@ -120,7 +122,7 @@ export default function useVapi(): VapiCallHook {
     const vapi = vapiRef.current || getVapiInstance();
     if (!vapi) return;
     vapiRef.current = vapi;
-    
+
     setErrorMessage(null);
     setCallState('connecting');
     setIsCalling(true);
@@ -137,7 +139,7 @@ export default function useVapi(): VapiCallHook {
             autoGainControl: true,
           }
         });
-        
+
         // Wake up browser AudioContext if suspended
         const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
         if (AudioContextClass) {
@@ -148,7 +150,7 @@ export default function useVapi(): VapiCallHook {
           }
           await tempCtx.close();
         }
-        
+
         // Immediately release the tracks so Vapi can bind to the device cleanly
         stream.getTracks().forEach((track) => track.stop());
         console.log('[useVapi Web] Microphone access and audio context ready.');
@@ -161,14 +163,20 @@ export default function useVapi(): VapiCallHook {
       }
     }
 
-    console.log('[useVapi Web] Starting call to Assistant ID:', VAPI_ASSISTANT_ID, 'with userId:', userId, 'sessionId:', sessionId);
+    // Fetch Clerk JWT token
+    let token: string | undefined;
     try {
-      const overrides: any = {};
-      if (userId || sessionId) {
-        overrides.variableValues = {};
-        if (userId) overrides.variableValues.user_id = userId;
-        if (sessionId) overrides.variableValues.session_id = sessionId;
-      }
+      token = await getToken({ template: 'vapi' });
+    } catch (e) {
+      // ignore if not available
+    }
+
+    console.log('[useVapi Web] Starting call to Assistant ID:', VAPI_ASSISTANT_ID, 'with userId:', userId, 'sessionId:', sessionId, 'hasToken:', !!token);
+    try {
+      const overrides: any = { variableValues: {} };
+      if (userId) overrides.variableValues.user_id = userId;
+      if (sessionId) overrides.variableValues.session_id = sessionId;
+      if (token) overrides.variableValues.token = token;
       await vapi.start(VAPI_ASSISTANT_ID, overrides);
     } catch (err: any) {
       console.error('Failed to initiate Vapi call:', err);
