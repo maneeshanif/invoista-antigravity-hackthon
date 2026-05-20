@@ -24,8 +24,15 @@ async def get_my_bookings(current_user: User = Depends(get_current_user)):
     Get all bookings associated with the current user.
     """
     # Get all bookings associated with the current user.
-    response = supabase.table("bookings").select("*").eq("user_id", str(current_user.id)).execute()
-    return response.data
+    response = supabase.table("bookings").select("*, provider_slots(slot_date, slot_time)").eq("user_id", str(current_user.id)).execute()
+    
+    bookings = []
+    for item in response.data:
+        if "provider_slots" in item and item["provider_slots"]:
+            item["slot_date"] = item["provider_slots"].get("slot_date")
+            item["slot_time"] = item["provider_slots"].get("slot_time")
+        bookings.append(item)
+    return bookings
 
 @router.get("/notifications", response_model=List[Notification])
 async def get_my_notifications(current_user: User = Depends(get_current_user)):

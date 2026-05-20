@@ -1,3 +1,4 @@
+// frontend/lib/useApi.ts
 import { useMemo } from 'react';
 import { useAuth, useUser } from '@clerk/expo';
 import { api } from './api';

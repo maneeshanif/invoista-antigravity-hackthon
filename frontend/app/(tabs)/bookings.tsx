@@ -6,7 +6,7 @@ import { useApi } from '@/lib/useApi';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Calendar, ChevronRight } from 'lucide-react-native';
+import { Calendar, ChevronRight, Clock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { Colors, Typography, Spacing, Radius } from '@/constants/theme';
 
@@ -19,6 +19,8 @@ interface Booking {
   status: 'confirmed' | 'cancelled';
   confirmation_code: string;
   booked_at: string; // ISO string
+  slot_date?: string;
+  slot_time?: string;
 }
 
 interface Provider {
@@ -136,6 +138,20 @@ export default function BookingsScreen() {
 
   const renderItem = ({ item }: { item: Booking }) => {
     const provider = providers[item.provider_id];
+
+    // Helper to format date cleanly
+    const getServiceDateStr = () => {
+      if (item.slot_date) {
+        try {
+          const d = new Date(item.slot_date);
+          return d.toLocaleDateString('en-PK', { weekday: 'short', month: 'short', day: 'numeric' });
+        } catch {
+          return item.slot_date;
+        }
+      }
+      return new Date(item.booked_at).toLocaleDateString('en-PK', { weekday: 'short', month: 'short', day: 'numeric' });
+    };
+
     return (
       <TouchableOpacity
         activeOpacity={0.8}
@@ -147,10 +163,20 @@ export default function BookingsScreen() {
             <StatusBadge status={item.status} />
           </View>
           <ThemedText style={styles.providerCategory}>{provider?.category ?? ''}</ThemedText>
-          <View style={styles.row}>
-            <Calendar size={16} color={Colors.dark.tint} />
-            <ThemedText style={styles.datetime}> {new Date(item.booked_at).toLocaleString()} </ThemedText>
+          
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginBottom: Spacing.xs }}>
+            <View style={styles.row}>
+              <Calendar size={14} color={Colors.dark.tint} />
+              <ThemedText style={styles.datetime}> {getServiceDateStr()} </ThemedText>
+            </View>
+            {item.slot_time && (
+              <View style={styles.row}>
+                <Clock size={14} color={Colors.dark.tint} />
+                <ThemedText style={styles.datetime}> {item.slot_time} </ThemedText>
+              </View>
+            )}
           </View>
+
           <View style={styles.row}>
             <ThemedText style={styles.confirmCode}>Code: {item.confirmation_code}</ThemedText>
           </View>

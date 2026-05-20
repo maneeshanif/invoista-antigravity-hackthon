@@ -106,8 +106,8 @@ def send_booking_emails(input: SendBookingEmailsInput) -> SendBookingEmailsOutpu
     from email.mime.multipart import MIMEMultipart
 
     # 1. Fetch booking
-    booking_resp = supabase_client.table("bookings").select("*").eq("id", input.booking_id).single().execute()
-    booking = booking_resp.data
+    booking_resp = supabase_client.table("bookings").select("*").eq("id", input.booking_id).execute()
+    booking = booking_resp.data[0] if booking_resp.data else None
     if not booking:
         return SendBookingEmailsOutput(
             success=False,
@@ -117,8 +117,8 @@ def send_booking_emails(input: SendBookingEmailsInput) -> SendBookingEmailsOutpu
         )
 
     # 2. Fetch slot
-    slot_resp = supabase_client.table("provider_slots").select("*").eq("id", booking["slot_id"]).single().execute()
-    slot = slot_resp.data
+    slot_resp = supabase_client.table("provider_slots").select("*").eq("id", booking["slot_id"]).execute()
+    slot = slot_resp.data[0] if slot_resp.data else None
     if not slot:
         return SendBookingEmailsOutput(
             success=False,
@@ -128,8 +128,8 @@ def send_booking_emails(input: SendBookingEmailsInput) -> SendBookingEmailsOutpu
         )
 
     # 3. Fetch user
-    user_resp = supabase_client.table("users").select("*").eq("id", input.user_id).single().execute()
-    user = user_resp.data
+    user_resp = supabase_client.table("users").select("*").eq("id", input.user_id).execute()
+    user = user_resp.data[0] if user_resp.data else None
     if not user:
         return SendBookingEmailsOutput(
             success=False,
@@ -139,8 +139,8 @@ def send_booking_emails(input: SendBookingEmailsInput) -> SendBookingEmailsOutpu
         )
 
     # 4. Fetch provider
-    provider_resp = supabase_client.table("providers").select("*").eq("id", input.provider_id).single().execute()
-    provider = provider_resp.data
+    provider_resp = supabase_client.table("providers").select("*").eq("id", input.provider_id).execute()
+    provider = provider_resp.data[0] if provider_resp.data else None
     if not provider:
         return SendBookingEmailsOutput(
             success=False,
@@ -148,6 +148,7 @@ def send_booking_emails(input: SendBookingEmailsInput) -> SendBookingEmailsOutpu
             provider_email_sent=False,
             details=f"Provider {input.provider_id} not found."
         )
+
 
     user_email = user.get("email")
     provider_email = provider.get("email")

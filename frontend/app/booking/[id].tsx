@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { GlassCard } from '@/components/shared/GlassCard';
 import { PremiumButton } from '@/components/shared/PremiumButton';
-import { Calendar, MapPin, CreditCard, ChevronLeft, CheckCircle2, AlertCircle, XCircle } from 'lucide-react-native';
+import { Calendar, MapPin, CreditCard, ChevronLeft, CheckCircle2, AlertCircle, XCircle, Clock } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/useApi';
 import type { Booking, Provider } from '@/lib/api';
@@ -20,13 +20,20 @@ function formatDate(iso: string): string {
   }
 }
 
-function formatTime(iso: string): string {
-  try {
-    const d = new Date(iso);
-    return d.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
-  } catch {
+function formatTime(iso?: string): string {
+  if (!iso) {
     return '';
   }
+  if (/^\d{1,2}:\d{2}\s*(?:AM|PM|am|pm)?$/i.test(iso)) {
+    return iso;
+  }
+  try {
+    const d = new Date(iso);
+    if (!isNaN(d.getTime())) {
+      return d.toLocaleTimeString('en-PK', { hour: '2-digit', minute: '2-digit' });
+    }
+  } catch {}
+  return iso;
 }
 
 export default function BookingScreen() {
@@ -174,14 +181,40 @@ export default function BookingScreen() {
         <GlassCard style={styles.infoCard}>
           <ThemedText style={styles.sectionLabel}>BOOKING DETAILS</ThemedText>
 
+          {/* Service Appointment Date */}
           <View style={styles.detailRow}>
             <Calendar size={16} color={Colors.dark.accent} />
             <View style={styles.detailContent}>
-              <ThemedText style={styles.detailLabel}>Date Booked</ThemedText>
-              <ThemedText style={styles.detailValue}>{formatDate(booking.booked_at)}</ThemedText>
+              <ThemedText style={styles.detailLabel}>Service Date</ThemedText>
+              <ThemedText style={styles.detailValue}>
+                {booking.slot_date ? formatDate(booking.slot_date) : formatDate(booking.booked_at)}
+              </ThemedText>
             </View>
           </View>
 
+          {/* Service Appointment Time */}
+          {booking.slot_time && (
+            <View style={styles.detailRow}>
+              <Clock size={16} color={Colors.dark.accent} />
+              <View style={styles.detailContent}>
+                <ThemedText style={styles.detailLabel}>Service Time</ThemedText>
+                <ThemedText style={styles.detailValue}>{formatTime(booking.slot_time)}</ThemedText>
+              </View>
+            </View>
+          )}
+
+          {/* Booked At Timestamp */}
+          <View style={styles.detailRow}>
+            <Calendar size={16} color="rgba(255,255,255,0.4)" />
+            <View style={styles.detailContent}>
+              <ThemedText style={styles.detailLabel}>Booked On</ThemedText>
+              <ThemedText style={styles.detailValue}>
+                {formatDate(booking.booked_at)} at {formatTime(booking.booked_at)}
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* Payment Method */}
           <View style={styles.detailRow}>
             <CreditCard size={16} color={Colors.dark.accent} />
             <View style={styles.detailContent}>

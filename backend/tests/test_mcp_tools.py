@@ -141,7 +141,7 @@ def test_find_providers_happy():
 # TEST 2 — find_providers: no match (READ ONLY)
 # ===========================================================================
 
-@run_test("find_providers — returns empty for unknown service type")
+@run_test("find_providers — returns demo fallback for unknown service type")
 def test_find_providers_no_match():
     result = find_providers(
         FindProvidersInput(
@@ -150,8 +150,9 @@ def test_find_providers_no_match():
             slot_date=date.fromisoformat(TOMORROW),
         )
     )
-    assert_eq("total_found", result.total_found, 0)
-    assert_eq("providers list empty", result.providers, [])
+    assert_eq("total_found", result.total_found, 1)
+    assert_eq("fallback provider name", result.providers[0].name, "Demo Premium Provider")
+    assert_eq("fallback provider id", result.providers[0].provider_id, "00000000-0000-0000-0000-000000000000")
 
 
 # ===========================================================================
@@ -241,10 +242,10 @@ def test_create_booking():
         supabase_client.table("provider_slots")
         .select("is_booked")
         .eq("id", SLOT_ALI_1)
-        .single()
         .execute()
     )
-    assert_eq("provider_slots.is_booked = True in DB", slot_row.data["is_booked"], True)
+    assert_eq("provider_slots.is_booked = True in DB", slot_row.data[0]["is_booked"] if slot_row.data else None, True)
+
 
 
 # ===========================================================================
@@ -278,7 +279,8 @@ def test_schedule_followups():
         ScheduleFollowupsInput(
             booking_id=_booking_id,
             user_id=DEMO_USER_ID,
-            slot_datetime=slot_dt,
+            slot_date=slot_dt.date().isoformat(),
+            slot_time=slot_dt.strftime("%I:%M %p"),
         )
     )
 
@@ -414,8 +416,46 @@ def test_write_trace_log():
 
 
 # ===========================================================================
+# TEST 8 — create_booking with Demo fallback provider & slot (safe seeding)
+# ===========================================================================
+
+@run_test("create_booking — dynamically seeds demo fallback provider + slot prior to booking")
+def test_create_booking_demo_fallback():
+    demo_provider_id = "00000000-0000-0000-0000-000000000000"
+    demo_slot_id = "00000000-0000-0000-0000-000000000001"
+
+    # Pre-clean
+    supabase_client.table("bookings").delete().eq("slot_id", demo_slot_id).execute()
+    supabase_client.table("provider_slots").delete().eq("id", demo_slot_id).execute()
+    supabase_client.table("providers").delete().eq("id", demo_provider_id).execute()
+
+    # Now run create_booking which should dynamically seed them
+    result = create_booking(
+        CreateBookingInput(
+            user_id=DEMO_USER_ID,
+            provider_id=demo_provider_id,
+            slot_id=demo_slot_id,
+        )
+    )
+
+    print(f"    ➜ demo bookings row dynamically inserted")
+    print(f"      id               : {result.booking_id}")
+    print(f"      confirmation_code: {result.confirmation_code}")
+    print(f"      status           : {result.status}")
+
+    assert_truthy("booking_id non-empty", result.booking_id)
+    assert_eq("status = confirmed", result.status, "confirmed")
+
+    # Clean up to leave DB tidy
+    supabase_client.table("bookings").delete().eq("id", result.booking_id).execute()
+    supabase_client.table("provider_slots").delete().eq("id", demo_slot_id).execute()
+    supabase_client.table("providers").delete().eq("id", demo_provider_id).execute()
+
+
+# ===========================================================================
 # Main runner
 # ===========================================================================
+
 
 if __name__ == "__main__":
     print("\n" + "=" * 60)
@@ -437,6 +477,8 @@ if __name__ == "__main__":
     test_schedule_followups()
     test_send_booking_emails()
     test_write_trace_log()
+    test_create_booking_demo_fallback()
+
 
     # ---------------------------------------------------------------------------
     # What's in your DB

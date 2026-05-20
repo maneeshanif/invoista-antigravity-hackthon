@@ -17,8 +17,14 @@ async def list_all_sessions():
 
 @router.get("/bookings", response_model=List[Booking])
 async def list_all_bookings():
-    response = supabase.table("bookings").select("*").order("booked_at", desc=True).execute()
-    return response.data
+    response = supabase.table("bookings").select("*, provider_slots(slot_date, slot_time)").order("booked_at", desc=True).execute()
+    bookings = []
+    for item in response.data:
+        if "provider_slots" in item and item["provider_slots"]:
+            item["slot_date"] = item["provider_slots"].get("slot_date")
+            item["slot_time"] = item["provider_slots"].get("slot_time")
+        bookings.append(item)
+    return bookings
 
 @router.get("/providers", response_model=List[Provider])
 async def list_all_providers():

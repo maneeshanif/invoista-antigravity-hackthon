@@ -25,3 +25,8 @@ def health_check():
 
 # Include the main router
 app.include_router(api_router, prefix="/api/v1")
+
+# Include the legacy Vapi router prefix directly on the app instance
+from app.api.routes import vapi
+app.include_router(vapi.router, prefix="/api/vapi", tags=["Vapi Legacy"])
+

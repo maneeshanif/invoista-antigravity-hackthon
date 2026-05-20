@@ -24,6 +24,19 @@
 - [x] 06-notifications-and-polling.md
 - [x] 07-bookingtab-and-request-refactor.md
 - [x] 08-landing-page-cleanup.md
+- [x] 12-vapi-voice-assistant-integration.md (Completed)
+- [x] 13-vapi-ui-improvements.md (Completed)
+- [x] 14-vapi-mcp-permanent-fixes.md (Completed)
+
+## Vapi MCP Tools Permanent Fixes — Completed (14-vapi-mcp-permanent-fixes.md)
+
+### P0 — Critical (All Done ✅)
+- [x] Dynamic Fallback & Location-Aware Ranking in `find_providers`
+- [x] Safe Dynamic Seeding inside `create_booking` to resolve `PGRST116`
+- [x] Fix database query `.single()` calls in Python Supabase client
+- [x] Fix and align backend test suite
+
+
 
 ## Integration Wiring — Completed (05-wiring-backend-with-frontend.md)
 
@@ -81,3 +94,22 @@
 ### P1 — High Priority (All Done ✅)
 - [x] Integrate dynamic booking results card and link to receipt screen `/booking/[id]` on successful completion
 - [x] Optimize responsive styling and test layout fluidity across device sizes
+
+## Vapi Voice Assistant Integration — Completed (12-vapi-voice-assistant-integration.md)
+
+### P0 — Critical (All Done ✅)
+- [x] Install needed calling packages (`@vapi-ai/react-native`, `@daily-co/react-native-daily-js`, etc.)
+- [x] Create platform-decoupled `useVapi` hooks (`useVapi.ts`, `useVapi.native.ts`, `useVapi.web.ts`) to prevent WebRTC crashes on web target
+- [x] Implement glassmorphic luxury `VoiceCallModal.tsx` with animated breathing visualizer loops using Reanimated
+- [x] Integrate pulsing floating call button (FAB) and Voice Call modal overlays into `HomeScreen`
+- [x] Configure necessary native microphone/background audio permissions in `app.json`
+
+## Vapi UI Improvements & Tool Tracing — Completed (13-vapi-ui-improvements.md)
+
+### P0 — Critical (All Done ✅)
+- [x] Global Toast & Pop-up Visibility: Mounted a secondary `<Toast />` component directly inside the Vapi Modal so that alerts render perfectly over high-priority overlay states on the topmost layer.
+- [x] Vapi MCP Tool Tracing UI: Created the "Agent Thought Process" panel inside `VoiceCallModal` displaying clean, non-technical, frosted glass visual logs.
+- [x] Human-Readable Dict Mapping: Normalized and mapped raw backend tool names (e.g. `find_providers`, `create_booking`) to friendly conversational statuses with beautiful Lucide icons.
+- [x] Completion State Transitions: Configured tool status states (`loading` -> `success` / `error`) and added a 3-second fadeout delay upon tool completion.
+- [x] Explicit End Call Control: Included a dedicated circular hang-up button styled convention-first with a high-contrast red background.
+

@@ -6,6 +6,7 @@ const BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? 'http://localhost:8000/
 export interface RequestCreate {
   message: string;
   user_id?: string;
+  voice_session?: boolean;
 }
 
 export interface RequestResponse {
@@ -68,6 +69,8 @@ export interface Booking {
   status: 'confirmed' | 'cancelled';
   confirmation_code: string;
   booked_at: string;
+  slot_date?: string;
+  slot_time?: string;
 }
 
 export interface TraceLog {

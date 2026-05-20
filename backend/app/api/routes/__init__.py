@@ -6,7 +6,8 @@ from app.api.routes import (
     bookings,
     followups,
     me,
-    admin
+    admin,
+    vapi
 )
 
 api_router = APIRouter()
@@ -18,4 +19,5 @@ api_router.include_router(bookings.router, prefix="/bookings", tags=["Bookings"]
 api_router.include_router(followups.router, prefix="/followups", tags=["Followups"])
 api_router.include_router(me.router, prefix="/me", tags=["Me"])
 api_router.include_router(admin.router, prefix="/admin", tags=["Admin"])
+api_router.include_router(vapi.router, prefix="/vapi", tags=["Vapi"])
 

@@ -49,6 +49,8 @@ class BookingBase(BaseModel):
     status: str
     confirmation_code: str
     booked_at: datetime
+    slot_date: Optional[date] = None
+    slot_time: Optional[str] = None
 
 class Booking(BookingBase):
     id: uuid.UUID

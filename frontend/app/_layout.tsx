@@ -1,3 +1,8 @@
+import { Platform } from 'react-native';
+if (Platform.OS !== 'web') {
+  require('react-native-get-random-values');
+}
+
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts, Outfit_400Regular, Outfit_500Medium, Outfit_700Bold } from '@expo-google-fonts/outfit';
 import { ClerkProvider, useAuth, useUser } from '@clerk/expo';

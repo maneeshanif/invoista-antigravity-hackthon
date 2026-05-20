@@ -185,15 +185,16 @@ class TraceRunHooks(RunHooksBase):
             if booking_id:
                 try:
                     from mcp_server.db import supabase_client
-                    booking_resp = supabase_client.table("bookings").select("provider_id").eq("id", booking_id).single().execute()
-                    if booking_resp.data and booking_resp.data.get("provider_id"):
-                        prov_id = booking_resp.data["provider_id"]
+                    booking_resp = supabase_client.table("bookings").select("provider_id").eq("id", booking_id).execute()
+                    if booking_resp.data:
+                        prov_id = booking_resp.data[0].get("provider_id")
                         output_payload["provider_id"] = prov_id
-                        prov_resp = supabase_client.table("providers").select("name").eq("id", prov_id).single().execute()
-                        if prov_resp.data and prov_resp.data.get("name"):
-                            provider_name = prov_resp.data["name"]
+                        prov_resp = supabase_client.table("providers").select("name").eq("id", prov_id).execute()
+                        if prov_resp.data:
+                            provider_name = prov_resp.data[0].get("name", "the selected professional")
                 except Exception as e:
                     print(f"Error querying provider name in hook: {e}")
+
             
             output_summary = f"Successfully confirmed the appointment and secured a slot with {provider_name}."
             

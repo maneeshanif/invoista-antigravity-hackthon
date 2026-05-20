@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Star,
   UserCheck,
-  XCircle
+  XCircle,
+  PhoneCall
 } from 'lucide-react-native';
 import { Colors, Spacing, Typography, Radius } from '@/constants/theme';
 import { ThemedText } from '@/components/themed-text';
@@ -28,6 +29,8 @@ import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { useApi } from '@/lib/useApi';
 import type { Session, TraceLog, Provider } from '@/lib/api';
+import useVapi from '@/hooks/useVapi';
+import { VoiceCallModal } from '@/components/shared/VoiceCallModal';
 
 const { width } = Dimensions.get('window');
 
@@ -110,6 +113,17 @@ export default function HomeScreen() {
   const { signOut } = useAuth();
   const router = useRouter();
   const { createRequest, getSession, getSessionTrace, exportSessionTrace, getProvider, approveBooking, rejectBooking } = useApi();
+
+  const {
+    isCalling,
+    callState,
+    startCall,
+    endCall,
+    isMuted,
+    toggleMute,
+    errorMessage,
+    activeTools,
+  } = useVapi();
 
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [submittingRequest, setSubmittingRequest] = useState(false);
@@ -688,6 +702,24 @@ export default function HomeScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Floating Call Button */}
+      {(!activeSessionId && !submittingRequest) && (
+        <TouchableOpacity style={styles.floatingCallFAB} onPress={() => startCall(user?.id || undefined)}>
+          <PhoneCall size={22} color="#00F3FF" />
+        </TouchableOpacity>
+      )}
+
+      {/* Voice Call Overlay Modal */}
+      <VoiceCallModal
+        visible={isCalling}
+        callState={callState}
+        isMuted={isMuted}
+        toggleMute={toggleMute}
+        endCall={endCall}
+        errorMessage={errorMessage}
+        activeTools={activeTools}
+      />
     </ThemedView>
   );
 }
@@ -1290,4 +1322,22 @@ const styles = StyleSheet.create({
     fontSize: Typography.sizes.sm,
     marginBottom: Spacing.sm
   },
+  floatingCallFAB: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    borderWidth: 1.5,
+    borderColor: '#00F3FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#00F3FF',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 10,
+    elevation: 8,
+  }
 });
