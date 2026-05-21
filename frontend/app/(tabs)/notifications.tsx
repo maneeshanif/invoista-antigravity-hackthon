@@ -107,31 +107,33 @@ export default function NotificationsScreen() {
     const isDeleting = deletingId === item.id;
 
     return (
-      <TouchableOpacity
-        style={[styles.notificationCard, !isRead && styles.unreadCard]}
-        onPress={() => {
-          handleRead(item.id, isRead);
-          handleAction(item);
-        }}
-        activeOpacity={0.7}
-      >
-        <View style={styles.iconContainer}>
-          {isFollowup ? (
-            <MessageSquare size={24} color={Colors.dark.tint} />
-          ) : (
-            <Bell size={24} color={Colors.dark.tint} />
-          )}
-        </View>
-        <View style={styles.contentContainer}>
-          <View style={styles.cardHeaderRow}>
-            <Text style={styles.typeText}>{isFollowup ? 'Follow-up Request' : 'Booking Update'}</Text>
-            {!isRead && <View style={styles.unreadDot} />}
+      <View style={[styles.notificationCard, !isRead && styles.unreadCard]}>
+        <TouchableOpacity
+          style={styles.notificationCardInner}
+          onPress={() => {
+            handleRead(item.id, isRead);
+            handleAction(item);
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={styles.iconContainer}>
+            {isFollowup ? (
+              <MessageSquare size={24} color={Colors.dark.tint} />
+            ) : (
+              <Bell size={24} color={Colors.dark.tint} />
+            )}
           </View>
-          <Text style={styles.messageText}>{item.message}</Text>
-          <Text style={styles.dateText}>
-            {new Date(item.scheduled_at).toLocaleString()}
-          </Text>
-        </View>
+          <View style={styles.contentContainer}>
+            <View style={styles.cardHeaderRow}>
+              <Text style={styles.typeText}>{isFollowup ? 'Follow-up Request' : 'Booking Update'}</Text>
+              {!isRead && <View style={styles.unreadDot} />}
+            </View>
+            <Text style={styles.messageText}>{item.message}</Text>
+            <Text style={styles.dateText}>
+              {new Date(item.scheduled_at).toLocaleString()}
+            </Text>
+          </View>
+        </TouchableOpacity>
         <TouchableOpacity
           style={styles.deleteBtn}
           onPress={() => handleDelete(item.id)}
@@ -143,7 +145,7 @@ export default function NotificationsScreen() {
             : <Trash2 size={16} color="#FF4B4B" />
           }
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -238,11 +240,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     backgroundColor: Colors.dark.surface,
     borderRadius: 16,
-    padding: 16,
     marginBottom: 12,
     borderWidth: 1,
     borderColor: Colors.dark.border,
     alignItems: 'center',
+    overflow: 'hidden',
+  },
+  notificationCardInner: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    paddingRight: 4,
   },
   unreadCard: {
     borderColor: 'rgba(0, 243, 255, 0.3)',
@@ -288,8 +297,8 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.5)',
   },
   deleteBtn: {
-    marginLeft: 12,
-    padding: 4,
+    paddingVertical: 16,
+    paddingHorizontal: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },

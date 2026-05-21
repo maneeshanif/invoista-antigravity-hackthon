@@ -213,11 +213,11 @@ export default function BookingsScreen() {
     };
 
     return (
-      <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => router.push(`/booking/${item.id}`)}
-      >
-        <GlassCard style={styles.card}>
+      <GlassCard style={styles.card}>
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={() => router.push(`/booking/${item.id}`)}
+        >
           <View style={styles.cardHeader}>
             <ThemedText style={styles.providerName}>{provider?.name ?? 'Unknown Provider'}</ThemedText>
             <StatusBadge status={item.status} />
@@ -236,29 +236,29 @@ export default function BookingsScreen() {
               </View>
             )}
           </View>
-
-          <View style={styles.cardFooter}>
-            <ThemedText style={styles.confirmCode}>Code: {item.confirmation_code}</ThemedText>
-            {isConfirmed && (
-              <TouchableOpacity
-                style={styles.cancelBtn}
-                onPress={(e) => { e.stopPropagation?.(); handleCancelOne(item.id); }}
-                disabled={isCancelling}
-                activeOpacity={0.7}
-              >
-                {isCancelling
-                  ? <ActivityIndicator size="small" color="#FF4B4B" />
-                  : <XCircle size={16} color="#FF4B4B" />
-                }
-                <ThemedText style={styles.cancelBtnText}>
-                  {isCancelling ? 'Cancelling…' : 'Cancel'}
-                </ThemedText>
-              </TouchableOpacity>
-            )}
-          </View>
           {!isConfirmed && <ChevronRight size={20} color={Colors.dark.tint} style={styles.chevron} />}
-        </GlassCard>
-      </TouchableOpacity>
+        </TouchableOpacity>
+
+        <View style={styles.cardFooter}>
+          <ThemedText style={styles.confirmCode}>Code: {item.confirmation_code}</ThemedText>
+          {isConfirmed && (
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => handleCancelOne(item.id)}
+              disabled={isCancelling}
+              activeOpacity={0.7}
+            >
+              {isCancelling
+                ? <ActivityIndicator size="small" color="#FF4B4B" />
+                : <XCircle size={16} color="#FF4B4B" />
+              }
+              <ThemedText style={styles.cancelBtnText}>
+                {isCancelling ? 'Cancelling…' : 'Cancel'}
+              </ThemedText>
+            </TouchableOpacity>
+          )}
+        </View>
+      </GlassCard>
     );
   };
 
